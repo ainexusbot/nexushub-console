@@ -1,43 +1,62 @@
-const API_BASE =
+const API_ROOT =
   import.meta.env.VITE_API_BASE ||
-  "https://reddit-backend-production-e0ba.up.railway.app/api/v1";
+  "https://nexushub-backend-production.up.railway.app";
+
+const API_BASE = `${API_ROOT}/api`;
+
+const TOKEN_KEY = "nexushub_token";
+const USER_KEY = "nexushub_user";
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+async function refreshToken() {
+  const res = await fetch(`${API_BASE}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => ({}));
+  if (data.accessToken) {
+    setToken(data.accessToken);
+    return data.accessToken;
+  }
+  return null;
+}
 
 async function request(endpoint, options = {}) {
-  const token = localStorage.getItem("reddit_token");
+  const token = getToken();
 
-  const config = {
+  const buildConfig = (accessToken) => ({
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
       ...options.headers,
     },
-  };
+  });
 
-  const response = await fetch(`${API_BASE}${endpoint}`, config);
+  let response = await fetch(`${API_BASE}${endpoint}`, buildConfig(token));
 
-  if (response.status === 401 && !endpoint.includes("/auth/token/refresh")) {
-    const refresh = localStorage.getItem("reddit_refresh");
-    if (refresh) {
-      const refreshResponse = await fetch(`${API_BASE}/auth/token/refresh/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh }),
-      });
-
-      if (refreshResponse.ok) {
-        const data = await refreshResponse.json();
-        localStorage.setItem("reddit_token", data.access);
-        if (data.refresh) {
-          localStorage.setItem("reddit_refresh", data.refresh);
-        }
-
-        config.headers.Authorization = `Bearer ${data.access}`;
-        return fetch(`${API_BASE}${endpoint}`, config);
-      } else {
-        localStorage.removeItem("reddit_token");
-        localStorage.removeItem("reddit_refresh");
-        localStorage.removeItem("reddit_user");
+  if (response.status === 401 && !endpoint.includes("/auth/")) {
+    const newToken = await refreshToken();
+    if (newToken) {
+      response = await fetch(`${API_BASE}${endpoint}`, buildConfig(newToken));
+    } else {
+      clearSession();
+      if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
     }
@@ -49,7 +68,12 @@ async function request(endpoint, options = {}) {
 export const api = {
   get: (endpoint) => request(endpoint, { method: "GET" }),
   post: (endpoint, data) =>
-    request(endpoint, { method: "POST", body: JSON.stringify(data) }),
+    request(endpoint, {
+      method: "POST",
+      ...(data !== undefined && { body: JSON.stringify(data) }),
+    }),
+  put: (endpoint, data) =>
+    request(endpoint, { method: "PUT", body: JSON.stringify(data) }),
   patch: (endpoint, data) =>
     request(endpoint, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (endpoint, data) =>

@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { api, getApiBase } from '../utils/api'
+import { getApiBase, getToken, setToken, clearSession } from '../utils/api'
 
 const AuthContext = createContext(null)
+
+const USER_KEY = 'nexushub_user'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -13,27 +15,40 @@ export function AuthProvider({ children }) {
   }, [])
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('reddit_token')
-    if (!token) {
+    const token = getToken()
+    const storedUser = localStorage.getItem(USER_KEY)
+
+    if (token && storedUser) {
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch {
+        clearSession()
+      }
       setLoading(false)
       return
     }
 
+    // No access token in memory — try to restore via refresh cookie.
     try {
-      const response = await api.post('/auth/authenticate/')
-      if (response.ok) {
-        const data = await response.json()
-        setUser(data.user)
-        localStorage.setItem('reddit_user', JSON.stringify(data.user))
+      const res = await fetch(`${getApiBase()}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.accessToken) {
+          setToken(data.accessToken)
+          if (data.user) {
+            setUser(data.user)
+            localStorage.setItem(USER_KEY, JSON.stringify(data.user))
+          }
+        }
       } else {
-        localStorage.removeItem('reddit_token')
-        localStorage.removeItem('reddit_refresh')
-        localStorage.removeItem('reddit_user')
+        clearSession()
       }
-    } catch (err) {
-      localStorage.removeItem('reddit_token')
-      localStorage.removeItem('reddit_refresh')
-      localStorage.removeItem('reddit_user')
+    } catch {
+      clearSession()
     } finally {
       setLoading(false)
     }
@@ -41,37 +56,22 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     setError(null)
-    
-    // Demo mode for testing
-    if (email === 'demo@example.com' || email.includes('demo')) {
-      const demoUser = {
-        id: 'demo-user-1',
-        email: email,
-        username: 'demouser'
-      }
-      localStorage.setItem('reddit_token', 'demo-token-' + Date.now())
-      localStorage.setItem('reddit_refresh', 'demo-refresh-' + Date.now())
-      localStorage.setItem('reddit_user', JSON.stringify(demoUser))
-      setUser(demoUser)
-      return true
-    }
-    
     try {
-      const response = await fetch(`${getApiBase()}/auth/email-login/`, {
+      const response = await fetch(`${getApiBase()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
       })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.detail || 'Login failed')
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.accessToken) {
+        throw new Error(data.error || data.message || 'Invalid email or password')
       }
 
-      localStorage.setItem('reddit_token', data.access)
-      localStorage.setItem('reddit_refresh', data.refresh)
-      localStorage.setItem('reddit_user', JSON.stringify(data.user))
+      setToken(data.accessToken)
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user))
       setUser(data.user)
       return true
     } catch (err) {
@@ -81,21 +81,23 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    const refresh = localStorage.getItem('reddit_refresh')
-    if (refresh) {
-      try {
-        await api.post('/auth/logout/', { refresh })
-      } catch (err) {
-      }
+    try {
+      await fetch(`${getApiBase()}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+    } catch {
+      // ignore network errors on logout
     }
-    localStorage.removeItem('reddit_token')
-    localStorage.removeItem('reddit_refresh')
-    localStorage.removeItem('reddit_user')
+    clearSession()
     setUser(null)
   }
 
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin' || user?.is_admin
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, loading, error, login, logout, checkAuth, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )

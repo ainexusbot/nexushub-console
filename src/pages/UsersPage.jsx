@@ -1,68 +1,56 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api, formatDate } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 import {
   Plus,
-  Edit2,
-  Trash2,
   X,
   Users,
   Eye,
   EyeOff,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   Search,
-  Shield,
   ShieldCheck,
-  ChevronLeft,
-  ChevronRight,
+  Shield,
+  Briefcase,
+  UserCog,
   Loader2,
 } from 'lucide-react'
 
-function AdminBadge({ isAdmin }) {
-  if (isAdmin) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-        <ShieldCheck className="w-3 h-3" />
-        Admin
-      </span>
-    )
+const ROLE_META = {
+  super_admin: { label: 'Super Admin', icon: ShieldCheck, className: 'bg-primary/10 text-primary' },
+  admin: { label: 'Admin', icon: Shield, className: 'bg-primary/10 text-primary' },
+  executive: { label: 'Executive', icon: Briefcase, className: 'bg-success/10 text-success' },
+  manager: { label: 'Manager', icon: UserCog, className: 'bg-secondary text-secondary-foreground' },
+}
+
+function RoleBadge({ role }) {
+  const meta = ROLE_META[role] || {
+    label: role || 'Unknown',
+    icon: Shield,
+    className: 'bg-muted text-muted-foreground',
   }
+  const Icon = meta.icon
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-      <Shield className="w-3 h-3" />
-      User
-    </span>
-  )
-}
-
-function VerifiedBadge({ isVerified }) {
-  const styles = isVerified
-    ? 'bg-success/10 text-success'
-    : 'bg-muted text-muted-foreground'
-  const Icon = isVerified ? CheckCircle : XCircle
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${styles}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${meta.className}`}
+    >
       <Icon className="w-3 h-3" />
-      {isVerified ? 'Verified' : 'Unverified'}
+      {meta.label}
     </span>
   )
 }
 
-function UserModal({ user, onClose, onSave }) {
+function RegisterModal({ onClose, onSave }) {
   const [formData, setFormData] = useState({
-    email: user?.email || '',
+    email: '',
     password: '',
-    first_name: user?.first_name || '',
-    last_name: user?.last_name || '',
-    is_admin: user?.is_admin || false,
+    firstName: '',
+    lastName: '',
+    role: 'manager',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-
-  const isEdit = !!user
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -70,34 +58,18 @@ function UserModal({ user, onClose, onSave }) {
     setError(null)
 
     try {
-      let response
-      if (isEdit) {
-        const payload = {
-          email: formData.email,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          is_admin: formData.is_admin,
-        }
-        if (formData.password) {
-          payload.password = formData.password
-        }
-        response = await api.patch(`/admin/users/${user.id}/`, payload)
-      } else {
-        const payload = {
-          email: formData.email,
-          password: formData.password,
-          first_name: formData.first_name || undefined,
-          last_name: formData.last_name || undefined,
-          is_admin: formData.is_admin,
-        }
-        response = await api.post('/admin/users/', payload)
+      const payload = {
+        email: formData.email.trim(),
+        password: formData.password,
+        role: formData.role,
+        firstName: formData.firstName.trim() || undefined,
+        lastName: formData.lastName.trim() || undefined,
       }
-
+      const response = await api.post('/auth/register', payload)
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to save user')
+        throw new Error(data.error || data.message || 'Failed to create user')
       }
-
       onSave()
     } catch (err) {
       setError(err.message)
@@ -110,9 +82,7 @@ function UserModal({ user, onClose, onSave }) {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-card rounded-xl border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">
-            {isEdit ? 'Edit User' : 'Add User'}
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Add Project User</h2>
           <button onClick={onClose} className="p-1 hover:bg-secondary rounded">
             <X className="w-5 h-5" />
           </button>
@@ -139,28 +109,29 @@ function UserModal({ user, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">
-              Password {!isEdit && '*'}
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-1">Password *</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required={!isEdit}
-                minLength={8}
+                required
+                minLength={5}
                 className="w-full px-3 py-2 pr-10 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder={isEdit ? 'Leave blank to keep current' : 'Min 8 characters'}
+                placeholder="Set an initial password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-secondary rounded"
               >
-                {showPassword ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="w-4 h-4 text-muted-foreground" />
+                )}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -168,36 +139,49 @@ function UserModal({ user, onClose, onSave }) {
               <label className="block text-sm font-medium text-foreground mb-1">First Name</label>
               <input
                 type="text"
-                value={formData.first_name}
-                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Иван"
+                placeholder="Ivan"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Last Name</label>
               <input
                 type="text"
-                value={formData.last_name}
-                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Петров"
+                placeholder="Petrov"
               />
             </div>
           </div>
 
-          <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.is_admin}
-              onChange={(e) => setFormData({ ...formData, is_admin: e.target.checked })}
-              className="w-4 h-4 rounded border-input accent-primary"
-            />
-            <div>
-              <span className="text-sm font-medium text-foreground">Administrator</span>
-              <p className="text-xs text-muted-foreground">Grant full admin privileges</p>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Role</label>
+            <div className="flex gap-2">
+              {[
+                { value: 'manager', label: 'Manager' },
+                { value: 'executive', label: 'Executive' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: opt.value })}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    formData.role === opt.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-          </label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Registration creates project users (executive or manager).
+            </p>
+          </div>
 
           <div className="flex gap-3 pt-2">
             <button
@@ -210,9 +194,10 @@ function UserModal({ user, onClose, onSave }) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loading ? 'Creating...' : 'Create User'}
             </button>
           </div>
         </form>
@@ -222,44 +207,26 @@ function UserModal({ user, onClose, onSave }) {
 }
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isAdmin } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [modalUser, setModalUser] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [deleteUser, setDeleteUser] = useState(null)
-  const [deleting, setDeleting] = useState(false)
-  const [togglingId, setTogglingId] = useState(null)
-
   const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [adminFilter, setAdminFilter] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize] = useState(20)
-  const [totalPages, setTotalPages] = useState(1)
-  const [count, setCount] = useState(0)
+  const [roleFilter, setRoleFilter] = useState('')
 
   useEffect(() => {
     fetchUsers()
-  }, [search, adminFilter, page])
+  }, [])
 
   const fetchUsers = async () => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      if (adminFilter) params.set('is_admin', adminFilter)
-      params.set('page', String(page))
-      params.set('page_size', String(pageSize))
-
-      const response = await api.get(`/admin/users/?${params.toString()}`)
+      const response = await api.get('/users')
       if (!response.ok) throw new Error('Failed to fetch users')
       const data = await response.json()
-      setUsers(data.results || [])
-      setTotalPages(data.total_pages || 1)
-      setCount(data.count || 0)
+      setUsers(Array.isArray(data) ? data : data.results || [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -267,115 +234,69 @@ export default function UsersPage() {
     }
   }
 
-  const handleSearch = (e) => {
-    e.preventDefault()
-    setPage(1)
-    setSearch(searchInput.trim())
-  }
-
-  const handleAdminFilter = (value) => {
-    setPage(1)
-    setAdminFilter(value)
-  }
-
-  const handleToggleAdmin = async (target) => {
-    setTogglingId(target.id)
-    try {
-      const response = await api.patch(`/admin/users/${target.id}/`, {
-        is_admin: !target.is_admin,
-      })
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to update admin role')
-      }
-      const updated = await response.json()
-      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setTogglingId(null)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteUser) return
-    setDeleting(true)
-    try {
-      const response = await api.delete(`/admin/users/${deleteUser.id}/`)
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to delete user')
-      }
-      setDeleteUser(null)
-      fetchUsers()
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const openEditModal = (u) => {
-    setModalUser(u)
-    setShowModal(true)
-  }
-
-  const openAddModal = () => {
-    setModalUser(null)
-    setShowModal(true)
-  }
-
-  const handleModalSave = () => {
-    setShowModal(false)
-    setModalUser(null)
-    fetchUsers()
-  }
-
   const fullName = (u) => {
-    const name = [u.first_name, u.last_name].filter(Boolean).join(' ')
+    const name = [u.firstName || u.first_name, u.lastName || u.last_name]
+      .filter(Boolean)
+      .join(' ')
     return name || '—'
   }
+
+  const filtered = useMemo(() => {
+    return users.filter((u) => {
+      if (roleFilter && u.role !== roleFilter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        const haystack = `${u.email || ''} ${fullName(u)}`.toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
+  }, [users, roleFilter, search])
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Users</h1>
-          <p className="text-muted-foreground mt-1">Manage admin panel users and permissions</p>
+          <p className="text-muted-foreground mt-1">Admins and project users across the platform</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add User
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add User
+          </button>
+        )}
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <form onSubmit={handleSearch} className="flex-1 relative">
+        <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="Search by email or name..."
           />
-        </form>
-        <div className="flex gap-2">
+        </div>
+        <div className="flex gap-2 flex-wrap">
           {[
             { value: '', label: 'All' },
-            { value: 'true', label: 'Admins' },
-            { value: 'false', label: 'Users' },
+            { value: 'super_admin', label: 'Super Admin' },
+            { value: 'admin', label: 'Admin' },
+            { value: 'executive', label: 'Executive' },
+            { value: 'manager', label: 'Manager' },
           ].map((opt) => (
             <button
               key={opt.value}
               type="button"
-              onClick={() => handleAdminFilter(opt.value)}
+              onClick={() => setRoleFilter(opt.value)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                adminFilter === opt.value
+                roleFilter === opt.value
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
               }`}
@@ -396,20 +317,13 @@ export default function UsersPage() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : users.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">No Users Found</h3>
-          <p className="text-muted-foreground mb-4">
-            {search || adminFilter ? 'Try adjusting your filters' : 'Add a user to get started'}
+          <p className="text-muted-foreground">
+            {search || roleFilter ? 'Try adjusting your filters' : 'Add a user to get started'}
           </p>
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add User
-          </button>
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -419,13 +333,11 @@ export default function UsersPage() {
                 <tr className="border-b border-border bg-muted/50">
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">User</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Role</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Created</th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => {
+                {filtered.map((u) => {
                   const isSelf = currentUser?.id === u.id
                   return (
                     <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/30">
@@ -441,46 +353,10 @@ export default function UsersPage() {
                         <div className="text-sm text-muted-foreground">{fullName(u)}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <AdminBadge isAdmin={u.is_admin} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <VerifiedBadge isVerified={u.is_verified} />
+                        <RoleBadge role={u.role} />
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {formatDate(u.created_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleToggleAdmin(u)}
-                            disabled={isSelf || togglingId === u.id}
-                            className="p-2 hover:bg-secondary rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={isSelf ? 'You cannot change your own role' : u.is_admin ? 'Revoke admin' : 'Make admin'}
-                          >
-                            {togglingId === u.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                            ) : u.is_admin ? (
-                              <ShieldCheck className="w-4 h-4 text-primary" />
-                            ) : (
-                              <Shield className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => openEditModal(u)}
-                            className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4 text-muted-foreground" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteUser(u)}
-                            disabled={isSelf}
-                            className="p-2 hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={isSelf ? 'You cannot delete your own account' : 'Delete'}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </button>
-                        </div>
+                        {formatDate(u.created_at || u.createdAt)}
                       </td>
                     </tr>
                   )
@@ -488,71 +364,17 @@ export default function UsersPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-            <p className="text-sm text-muted-foreground">
-              {count} user{count === 1 ? '' : 's'} · Page {page} of {totalPages}
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="p-2 hover:bg-secondary rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Previous page"
-              >
-                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="p-2 hover:bg-secondary rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Next page"
-              >
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* Add/Edit Modal */}
       {showModal && (
-        <UserModal
-          user={modalUser}
-          onClose={() => {
+        <RegisterModal
+          onClose={() => setShowModal(false)}
+          onSave={() => {
             setShowModal(false)
-            setModalUser(null)
+            fetchUsers()
           }}
-          onSave={handleModalSave}
         />
-      )}
-
-      {/* Delete Confirmation */}
-      {deleteUser && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-xl border border-border p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold text-foreground mb-2">Delete User?</h3>
-            <p className="text-muted-foreground mb-4">
-              This will permanently delete <span className="font-medium text-foreground">{deleteUser.email}</span>. This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteUser(null)}
-                className="flex-1 px-4 py-2 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

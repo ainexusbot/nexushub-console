@@ -1,27 +1,23 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { api, formatRelativeTime } from '../utils/api'
-import { 
-  UserCircle, 
-  Globe, 
-  CheckCircle, 
-  XCircle,
-  AlertCircle,
-  Clock,
+import { api, formatDate } from '../utils/api'
+import { useAuth } from '../context/AuthContext'
+import {
+  Building2,
+  Users,
+  FileText,
   ArrowRight,
-  Shield
+  Plus,
 } from 'lucide-react'
 
 function StatCard({ title, value, subtitle, icon: Icon, href }) {
   const content = (
-    <div className="bg-card rounded-xl border border-border p-6 hover:border-primary/50 transition-colors">
+    <div className="bg-card rounded-xl border border-border p-6 hover:border-primary/50 transition-colors h-full">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           <p className="text-2xl font-bold text-foreground mt-2">{value}</p>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
         </div>
         <div className="p-3 rounded-lg bg-primary/10">
           <Icon className="w-6 h-6 text-primary" />
@@ -30,53 +26,14 @@ function StatCard({ title, value, subtitle, icon: Icon, href }) {
     </div>
   )
 
-  if (href) {
-    return <Link to={href}>{content}</Link>
-  }
+  if (href) return <Link to={href}>{content}</Link>
   return content
 }
 
-function StatusBadge({ status }) {
-  const styles = {
-    active: 'bg-green-500/10 text-green-500',
-    inactive: 'bg-gray-500/10 text-gray-500',
-    needs_login: 'bg-yellow-500/10 text-yellow-500',
-    suspended: 'bg-orange-500/10 text-orange-500',
-    banned: 'bg-red-500/10 text-red-500',
-    error: 'bg-red-500/10 text-red-500',
-  }
-  
-  const icons = {
-    active: CheckCircle,
-    inactive: XCircle,
-    needs_login: Clock,
-    suspended: AlertCircle,
-    banned: Shield,
-    error: AlertCircle,
-  }
-  
-  const labels = {
-    active: 'Active',
-    inactive: 'Inactive',
-    needs_login: 'Needs Login',
-    suspended: 'Suspended',
-    banned: 'Banned',
-    error: 'Error',
-  }
-  
-  const Icon = icons[status] || icons.inactive
-  
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles.inactive}`}>
-      <Icon className="w-3 h-3" />
-      {labels[status] || status}
-    </span>
-  )
-}
-
 export default function DashboardPage() {
-  const [accounts, setAccounts] = useState([])
-  const [proxies, setProxies] = useState([])
+  const { user } = useAuth()
+  const [organizations, setOrganizations] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -85,22 +42,22 @@ export default function DashboardPage() {
   }, [])
 
   const fetchData = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const [accountsRes, proxiesRes] = await Promise.all([
-        api.get('/reddit-accounts'),
-        api.get('/proxies'),
+      const [orgsRes, usersRes] = await Promise.all([
+        api.get('/organizations'),
+        api.get('/users'),
       ])
-      
-      if (!accountsRes.ok) throw new Error('Failed to fetch accounts')
-      if (!proxiesRes.ok) throw new Error('Failed to fetch proxies')
-      
-      const [accountsData, proxiesData] = await Promise.all([
-        accountsRes.json(),
-        proxiesRes.json(),
-      ])
-      
-      setAccounts(accountsData)
-      setProxies(proxiesData)
+
+      if (orgsRes.ok) {
+        const data = await orgsRes.json()
+        setOrganizations(Array.isArray(data) ? data : data.results || [])
+      }
+      if (usersRes.ok) {
+        const data = await usersRes.json()
+        setUsers(Array.isArray(data) ? data : data.results || [])
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -116,202 +73,102 @@ export default function DashboardPage() {
     )
   }
 
-  if (error) {
-    return (
-      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-        <p className="text-destructive">Error: {error}</p>
-      </div>
-    )
-  }
-
-  const activeAccounts = accounts.filter(a => a.status === 'active').length
-  const needsLoginAccounts = accounts.filter(a => a.status === 'needs_login').length
-  const problemAccounts = accounts.filter(a => ['suspended', 'banned', 'error'].includes(a.status)).length
-  const activeProxies = proxies.filter(p => p.status === 'active').length
+  const executives = users.filter((u) => u.role === 'executive').length
+  const managers = users.filter((u) => u.role === 'manager').length
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Overview of your Reddit accounts</p>
+        <p className="text-muted-foreground mt-1">
+          Welcome back{user?.email ? `, ${user.email}` : ''} — overview of your workspace
+        </p>
       </div>
+
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+          <p className="text-destructive">Error: {error}</p>
+        </div>
+      )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
-          title="Total Accounts"
-          value={accounts.length}
-          subtitle={`${activeAccounts} active`}
-          icon={UserCircle}
-          href="/reddit-accounts"
+          title="Organizations"
+          value={organizations.length}
+          subtitle="Active workspaces"
+          icon={Building2}
+          href="/organizations"
         />
         <StatCard
-          title="Active Sessions"
-          value={activeAccounts}
-          subtitle="Ready to use"
-          icon={CheckCircle}
-          href="/reddit-accounts"
+          title="Project Users"
+          value={executives + managers}
+          subtitle={`${executives} executive · ${managers} manager`}
+          icon={Users}
+          href="/users"
         />
         <StatCard
-          title="Needs Attention"
-          value={needsLoginAccounts + problemAccounts}
-          subtitle={needsLoginAccounts > 0 ? `${needsLoginAccounts} needs login` : 'All good'}
-          icon={AlertCircle}
-          href="/reddit-accounts"
-        />
-        <StatCard
-          title="Proxies"
-          value={proxies.length}
-          subtitle={`${activeProxies} active`}
-          icon={Globe}
-          href="/proxies"
+          title="Total Users"
+          value={users.length}
+          subtitle="Including admins"
+          icon={Users}
+          href="/users"
         />
       </div>
 
-      {/* Alerts */}
-      {needsLoginAccounts > 0 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <Clock className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-foreground">Sessions Expired</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {needsLoginAccounts} account{needsLoginAccounts > 1 ? 's need' : ' needs'} to be reconnected. 
-                Click Connect to re-login via browser automation.
-              </p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {accounts.filter(a => a.status === 'needs_login').slice(0, 5).map((account) => (
-                  <span key={account.id} className="px-2 py-1 rounded bg-yellow-500/20 text-sm text-yellow-600">
-                    u/{account.reddit_username}
-                  </span>
-                ))}
-                {needsLoginAccounts > 5 && (
-                  <span className="px-2 py-1 text-sm text-yellow-600">
-                    +{needsLoginAccounts - 5} more
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {problemAccounts > 0 && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-foreground">Account Issues</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {problemAccounts} account{problemAccounts > 1 ? 's have' : ' has'} issues (suspended, banned, or error).
-              </p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {accounts.filter(a => ['suspended', 'banned', 'error'].includes(a.status)).slice(0, 5).map((account) => (
-                  <span key={account.id} className={`px-2 py-1 rounded text-sm ${
-                    account.status === 'banned' ? 'bg-red-500/20 text-red-600' :
-                    account.status === 'suspended' ? 'bg-orange-500/20 text-orange-600' :
-                    'bg-red-500/20 text-red-600'
-                  }`}>
-                    u/{account.reddit_username} ({account.status})
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recent Accounts */}
+      {/* Recent Organizations */}
       <div className="bg-card rounded-xl border border-border">
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="font-semibold text-foreground">Recent Accounts</h2>
-          <Link 
-            to="/reddit-accounts" 
+          <h2 className="font-semibold text-foreground">Organizations</h2>
+          <Link
+            to="/organizations"
             className="text-sm text-primary hover:text-primary/80 inline-flex items-center gap-1"
           >
             View all <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-        
-        {accounts.length === 0 ? (
+
+        {organizations.length === 0 ? (
           <div className="p-8 text-center">
-            <UserCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">No accounts yet</p>
-            <Link 
-              to="/reddit-accounts" 
-              className="text-sm text-primary hover:text-primary/80 mt-2 inline-block"
+            <Building2 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">No organizations yet</p>
+            <Link
+              to="/organizations"
+              className="text-sm text-primary hover:text-primary/80 mt-2 inline-flex items-center gap-1"
             >
-              Add your first account
+              <Plus className="w-4 h-4" /> Create your first organization
             </Link>
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {accounts.slice(0, 5).map((account) => (
-              <div key={account.id} className="flex items-center justify-between p-4">
+            {organizations.slice(0, 6).map((org) => (
+              <Link
+                key={org.id}
+                to={`/organizations/${org.id}`}
+                className="flex items-center justify-between p-4 hover:bg-muted/40 transition-colors"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <UserCircle className="w-5 h-5 text-primary" />
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">u/{account.reddit_username}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {account.karma !== null ? `${account.karma?.toLocaleString()} karma` : 'No karma data'}
-                      {account.proxy_name && ` • ${account.proxy_name}`}
+                    <p className="font-medium text-foreground">{org.name}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-1">
+                      {org.description || 'No description'}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={account.status} />
-                  {account.last_used_at && (
-                    <span className="text-sm text-muted-foreground hidden sm:block">
-                      {formatRelativeTime(account.last_used_at)}
-                    </span>
-                  )}
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground hidden sm:flex items-center gap-1">
+                    <FileText className="w-4 h-4" />
+                    {org.instruction_count ?? org.instructionsCount ?? 0}
+                  </span>
+                  <span className="text-sm text-muted-foreground hidden md:block">
+                    {formatDate(org.created_at || org.createdAt)}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Proxies Status */}
-      <div className="bg-card rounded-xl border border-border">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="font-semibold text-foreground">Proxies</h2>
-          <Link 
-            to="/proxies" 
-            className="text-sm text-primary hover:text-primary/80 inline-flex items-center gap-1"
-          >
-            Manage <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-        {proxies.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-muted-foreground">No proxies configured</p>
-            <Link 
-              to="/proxies" 
-              className="text-sm text-primary hover:text-primary/80 mt-2 inline-block"
-            >
-              Add a proxy
-            </Link>
-          </div>
-        ) : (
-          <div className="p-4 space-y-2">
-            {proxies.slice(0, 5).map((proxy) => (
-              <div key={proxy.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-foreground">{proxy.name || `${proxy.host}:${proxy.port}`}</span>
-                  <span className="text-xs text-muted-foreground uppercase">{proxy.type}</span>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs ${
-                  proxy.status === 'active' ? 'bg-green-500/10 text-green-500' : 
-                  proxy.status === 'error' ? 'bg-red-500/10 text-red-500' :
-                  'bg-gray-500/10 text-gray-500'
-                }`}>
-                  {proxy.status}
-                </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}
