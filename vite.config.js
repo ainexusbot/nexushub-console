@@ -7,18 +7,10 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    allowedHosts: [
-      "admin.ctrlcat.my",
-      "reddit-admin-production.up.railway.app",
-      "reddit-admin-production-34af.up.railway.app",
-    ],
+    allowedHosts: ["nexushub-console-production.up.railway.app"],
   },
 
   preview: {
-    allowedHosts: [
-      "admin.ctrlcat.my",
-      "reddit-admin-production.up.railway.app",
-      "reddit-admin-production-34af.up.railway.app",
-    ],
+    allowedHosts: ["nexushub-console-production.up.railway.app"],
   },
 });
