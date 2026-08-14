@@ -17,12 +17,12 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
+
     const success = await login(email, password)
     if (success) {
       navigate('/')
     }
-    
+
     setLoading(false)
   }
 
@@ -32,11 +32,11 @@ export default function LoginPage() {
         <div className="bg-card rounded-xl shadow-lg border border-border p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-              <Lock className="w-8 h-8 text-primary" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground text-2xl font-bold mb-4">
+              N
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Reddit Panel</h1>
-            <p className="text-muted-foreground mt-2">Sign in to manage your accounts</p>
+            <h1 className="text-2xl font-bold text-foreground">NexusHub Admin</h1>
+            <p className="text-muted-foreground mt-2">Sign in to the administration panel</p>
           </div>
 
           {/* Error message */}
@@ -62,7 +62,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow"
-                  placeholder="admin@example.com"
+                  placeholder="root@mail.com"
                 />
               </div>
             </div>
@@ -103,25 +103,8 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Reddit Account Management Panel
+          NexusHub Administration Panel
         </p>
-
-        {/* Demo Mode Note */}
-        <div className="mt-6 pt-4 border-t border-border">
-          <p className="text-xs text-center text-muted-foreground">
-            Demo Mode: You can test with any email/password combination
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('demo@example.com')
-              setPassword('demo123')
-            }}
-            className="w-full mt-2 text-xs px-3 py-1 rounded bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-          >
-            Use Demo Credentials
-          </button>
-        </div>
       </div>
     </div>
   )

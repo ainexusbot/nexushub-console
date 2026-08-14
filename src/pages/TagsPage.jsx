@@ -8,8 +8,6 @@ import {
   AlertCircle,
   Search,
   Tag as TagIcon,
-  Hash,
-  Globe,
   Loader2,
 } from 'lucide-react'
 import TagBadge from '../components/TagBadge'
@@ -230,7 +228,7 @@ export default function TagsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tags</h1>
           <p className="text-muted-foreground mt-1">
-            Reusable labels for subreddits and proxies. Use them to filter and sort.
+            Reusable labels for organizing users and entities. Use them to filter and sort.
           </p>
         </div>
         <button
@@ -274,7 +272,7 @@ export default function TagsPage() {
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <TagIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">No Tags</h3>
-          <p className="text-muted-foreground mb-4">Create a tag to start labeling subreddits and proxies</p>
+          <p className="text-muted-foreground mb-4">Create a tag to start labeling users and entities</p>
           <button
             onClick={() => {
               setEditTag(null)
@@ -309,19 +307,9 @@ export default function TagsPage() {
                       {tag.description || '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                          {tag.usage_count ?? 0} total
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                          <Hash className="w-3 h-3" />
-                          {tag.subreddit_count ?? 0}
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                          <Globe className="w-3 h-3" />
-                          {tag.proxy_count ?? 0}
-                        </span>
-                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                        {tag.usage_count ?? 0} total
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(tag.created_at)}</td>
                     <td className="px-4 py-3">
