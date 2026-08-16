@@ -40,7 +40,9 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
         const res = await api.get('/users')
         if (res.ok) {
           const data = await res.json()
-          const list = Array.isArray(data) ? data : data.results || []
+          const list = Array.isArray(data)
+            ? data
+            : data.users || data.results || []
           setUsers(list.filter((u) => !existingIds.includes(u.id)))
         }
       } catch {
