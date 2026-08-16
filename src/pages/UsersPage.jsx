@@ -18,6 +18,8 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 
 const ROLE_META = {
@@ -255,6 +257,239 @@ function RegisterModal({ onClose, onSave }) {
   )
 }
 
+function EditUserModal({ user, canManageAdmins, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    email: user.email || '',
+    firstName: user.firstName || user.first_name || '',
+    lastName: user.lastName || user.last_name || '',
+    role: user.role || 'manager',
+    isVerified: user.isVerified ?? user.is_verified ?? false,
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  // Only a super_admin may assign admin-level roles.
+  const roleOptions = [
+    { value: 'manager', label: 'Manager' },
+    { value: 'executive', label: 'Executive' },
+    ...(canManageAdmins
+      ? [
+          { value: 'admin', label: 'Admin' },
+          { value: 'super_admin', label: 'Super Admin' },
+        ]
+      : []),
+  ]
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      const payload = {
+        email: formData.email.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        role: formData.role,
+        isVerified: formData.isVerified,
+      }
+      const response = await api.patch(`/users/${user.id}`, payload)
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(
+          data.error || data.detail || data.message || 'Failed to update user',
+        )
+      }
+      onSave()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-card rounded-xl border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Edit User</h2>
+          <button onClick={onClose} className="p-1 hover:bg-secondary rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+              className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="user@example.com"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">First Name</label>
+              <input
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Ivan"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Last Name</label>
+              <input
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Petrov"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">Role</label>
+            <div className="flex flex-wrap gap-2">
+              {roleOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: opt.value })}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    formData.role === opt.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {!canManageAdmins && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Only a super admin can assign admin roles.
+              </p>
+            )}
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.isVerified}
+              onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
+              className="w-4 h-4 rounded border-input accent-primary"
+            />
+            <span className="text-sm font-medium text-foreground">Verified</span>
+          </label>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function DeleteUserModal({ user, onClose, onDeleted }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleDelete = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await api.delete(`/users/${user.id}`)
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(
+          data.error || data.detail || data.message || 'Failed to delete user',
+        )
+      }
+      onDeleted()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-card rounded-xl border border-border w-full max-w-md">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Delete User</h2>
+          <button onClick={onClose} className="p-1 hover:bg-secondary rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          <p className="text-sm text-foreground">
+            {'Are you sure you want to delete '}
+            <span className="font-semibold">{user.email}</span>
+            {'? This action cannot be undone.'}
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={loading}
+              className="flex-1 px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {loading ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const PAGE_SIZE = 25
 
 export default function UsersPage() {
@@ -264,6 +499,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [editUser, setEditUser] = useState(null)
+  const [deleteUser, setDeleteUser] = useState(null)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
@@ -325,6 +562,16 @@ export default function UsersPage() {
       .filter(Boolean)
       .join(' ')
     return name || '—'
+  }
+
+  const isSuperAdmin = currentUser?.role === 'super_admin'
+
+  // Editing admin accounts (super_admin/admin) is restricted to super_admins.
+  const canEditUser = (u) => {
+    const targetIsAdmin =
+      u.role === 'super_admin' || u.role === 'admin' || u.isAdmin || u.is_admin
+    if (targetIsAdmin) return isSuperAdmin
+    return true
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -415,6 +662,9 @@ export default function UsersPage() {
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Role</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Created</th>
+                  {isAdmin && (
+                    <th className="text-right px-4 py-3 text-sm font-medium text-muted-foreground">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -449,6 +699,37 @@ export default function UsersPage() {
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {formatDate(u.created_at || u.createdAt)}
                       </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {canEditUser(u) ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditUser(u)}
+                                  title="Edit user"
+                                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                  <span className="sr-only">Edit user</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteUser(u)}
+                                  disabled={isSelf}
+                                  title={isSelf ? 'You cannot delete yourself' : 'Delete user'}
+                                  className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <span className="sr-only">Delete user</span>
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -497,6 +778,29 @@ export default function UsersPage() {
             } else {
               setPage(0)
             }
+          }}
+        />
+      )}
+
+      {editUser && (
+        <EditUserModal
+          user={editUser}
+          canManageAdmins={isSuperAdmin}
+          onClose={() => setEditUser(null)}
+          onSave={() => {
+            setEditUser(null)
+            fetchUsers()
+          }}
+        />
+      )}
+
+      {deleteUser && (
+        <DeleteUserModal
+          user={deleteUser}
+          onClose={() => setDeleteUser(null)}
+          onDeleted={() => {
+            setDeleteUser(null)
+            fetchUsers()
           }}
         />
       )}
