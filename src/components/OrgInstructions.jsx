@@ -42,8 +42,12 @@ const GROUP_OPTIONS = [
     label: "Analyses",
     description: "Applied when generating analyses",
     icon: LineChart,
+    hidden: true,
   },
 ];
+
+// Groups the user can actually pick when creating/editing an instruction.
+const SELECTABLE_GROUP_OPTIONS = GROUP_OPTIONS.filter((g) => !g.hidden);
 
 function getGroupMeta(groupType) {
   return (
@@ -129,7 +133,7 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
               Entity group *
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {GROUP_OPTIONS.map((opt) => {
+              {SELECTABLE_GROUP_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const active = groupType === opt.value;
                 return (
