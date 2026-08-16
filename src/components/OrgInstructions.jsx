@@ -12,11 +12,55 @@ import {
   Loader2,
   Eye,
   Info,
+  Building2,
+  User,
+  Mail,
+  LineChart,
 } from "lucide-react";
+
+const GROUP_OPTIONS = [
+  {
+    value: "company",
+    label: "Companies",
+    description: "Applied when analyzing companies",
+    icon: Building2,
+  },
+  {
+    value: "person",
+    label: "People",
+    description: "Applied when analyzing people",
+    icon: User,
+  },
+  {
+    value: "email",
+    label: "Emails",
+    description: "Applied when generating emails",
+    icon: Mail,
+  },
+  {
+    value: "analysis",
+    label: "Analyses",
+    description: "Applied when generating analyses",
+    icon: LineChart,
+  },
+];
+
+function getGroupMeta(groupType) {
+  return (
+    GROUP_OPTIONS.find((g) => g.value === groupType) || {
+      value: groupType,
+      label: groupType || "Unknown",
+      icon: FileText,
+    }
+  );
+}
 
 function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
   const [title, setTitle] = useState(instruction?.title || "");
   const [content, setContent] = useState(instruction?.content || "");
+  const [groupType, setGroupType] = useState(
+    instruction?.group_type || instruction?.groupType || "company",
+  );
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,8 +83,8 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
     setError(null);
     try {
       const payload = isEdit
-        ? { input: { title: title.trim(), content } }
-        : { organizationId, input: { title: title.trim(), content } };
+        ? { input: { title: title.trim(), content, groupType } }
+        : { organizationId, input: { title: title.trim(), content, groupType } };
 
       const response = isEdit
         ? await api.put(`/instructions/${instruction.id}`, payload)
@@ -80,13 +124,49 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
             </div>
           )}
 
-          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
-            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">
-              This instruction applies to{" "}
-              <span className="font-medium text-foreground">every</span>{" "}
-              company, person and group in this organization automatically.
-              There is no need to attach it to a specific entity.
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Entity group *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {GROUP_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const active = groupType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setGroupType(opt.value)}
+                    className={`flex items-start gap-2 p-3 rounded-lg border text-left transition-colors ${
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-secondary"
+                    }`}
+                  >
+                    <Icon
+                      className={`w-4 h-4 shrink-0 mt-0.5 ${
+                        active ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    />
+                    <span className="min-w-0">
+                      <span
+                        className={`block text-sm font-medium ${
+                          active ? "text-foreground" : "text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {opt.description}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              The instruction applies to all entities of the selected group in
+              this organization.
             </p>
           </div>
 
@@ -214,13 +294,24 @@ function InstructionViewer({ instructionId, onClose }) {
           </div>
         ) : (
           <div className="p-4 space-y-4">
-            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
-              <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground">
-                Applied automatically to all companies, people and groups in
-                this organization.
-              </p>
-            </div>
+            {(() => {
+              const meta = getGroupMeta(
+                instruction?.group_type || instruction?.groupType,
+              );
+              const Icon = meta.icon;
+              return (
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
+                  <Icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground">
+                    Applied to all{" "}
+                    <span className="font-medium text-foreground">
+                      {meta.label.toLowerCase()}
+                    </span>{" "}
+                    in this organization.
+                  </p>
+                </div>
+              );
+            })()}
             <pre className="whitespace-pre-wrap break-words bg-muted/50 border border-border rounded-lg p-4 text-sm text-foreground font-mono max-h-[60vh] overflow-y-auto">
               {instruction?.content}
             </pre>
@@ -300,11 +391,10 @@ export default function OrgInstructions({ organizationId }) {
       <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
-          These instructions form a single library for this organization. Every
-          instruction here is applied automatically to{" "}
-          <span className="font-medium text-foreground">all</span> companies,
-          people and groups during analysis and content generation — no manual
-          attaching needed.
+          Each instruction is bound to an entity group — companies, people,
+          emails or analyses. It is applied automatically to{" "}
+          <span className="font-medium text-foreground">all</span> entities of
+          its group when generating content for that group.
         </p>
       </div>
 
@@ -367,15 +457,29 @@ export default function OrgInstructions({ organizationId }) {
                   <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div className="min-w-0 space-y-1.5">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setViewId(item.id);
-                    }}
-                    className="font-medium text-foreground hover:text-primary hover:underline transition-colors text-left cursor-pointer"
-                  >
-                    {item.title}
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewId(item.id);
+                      }}
+                      className="font-medium text-foreground hover:text-primary hover:underline transition-colors text-left cursor-pointer"
+                    >
+                      {item.title}
+                    </button>
+                    {(() => {
+                      const meta = getGroupMeta(
+                        item.group_type || item.groupType,
+                      );
+                      const Icon = meta.icon;
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                          <Icon className="w-3 h-3" />
+                          {meta.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <p className="text-sm text-muted-foreground line-clamp-1">
                     {(item.content || "").slice(0, 120) || "Empty document"}
                   </p>
