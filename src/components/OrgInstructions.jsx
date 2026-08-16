@@ -10,132 +10,9 @@ import {
   FileText,
   Upload,
   Loader2,
-  Link2,
   Eye,
-  Building2,
-  User,
-  Mail,
-  BarChart3,
-  ArrowUpDown,
+  Info,
 } from 'lucide-react'
-
-const ENTITY_TYPES = [
-  { value: 'company', label: 'Company' },
-  { value: 'person', label: 'Person' },
-  { value: 'email', label: 'Email' },
-  { value: 'analysis', label: 'Analysis' },
-]
-
-// Visual metadata for each entity type an instruction can be attached to.
-const ENTITY_META = {
-  company: {
-    label: 'Company',
-    plural: 'Companies',
-    icon: Building2,
-    badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-    dot: 'bg-blue-500',
-  },
-  person: {
-    label: 'Person',
-    plural: 'People',
-    icon: User,
-    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    dot: 'bg-emerald-500',
-  },
-  email: {
-    label: 'Email',
-    plural: 'Emails',
-    icon: Mail,
-    badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    dot: 'bg-amber-500',
-  },
-  analysis: {
-    label: 'Analysis',
-    plural: 'Analyses',
-    icon: BarChart3,
-    badge: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-    dot: 'bg-violet-500',
-  },
-}
-
-// Normalize the various assignment shapes the API may return into { type, id }.
-function normalizeAssignments(item) {
-  const raw = item?.assignments || item?.assignedTo || item?.instructionAssignments || []
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((a) => ({
-      type: a.entityType || a.entity_type || a.type,
-      id: a.entityId || a.entity_id || a.id,
-    }))
-    .filter((a) => a.type)
-}
-
-// Count assignments per entity type.
-function countByType(assignments) {
-  return assignments.reduce((acc, a) => {
-    acc[a.type] = (acc[a.type] || 0) + 1
-    return acc
-  }, {})
-}
-
-const SORT_OPTIONS = [
-  { value: 'updated', label: 'Recently updated' },
-  { value: 'title', label: 'Title (A–Z)' },
-  { value: 'assigned', label: 'Most attached' },
-]
-
-// Tags showing which entity types an instruction is attached to.
-function InstructionTags({ assignments }) {
-  const counts = countByType(assignments)
-  const types = Object.keys(counts)
-
-  if (types.length === 0) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-        Not attached
-      </span>
-    )
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {ENTITY_TYPES.filter((t) => counts[t.value]).map((t) => {
-        const meta = ENTITY_META[t.value]
-        const Icon = meta.icon
-        const count = counts[t.value]
-        return (
-          <span
-            key={t.value}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}
-            title={`${count} ${count === 1 ? meta.label : meta.plural}`}
-          >
-            <Icon className="w-3 h-3" />
-            {count} {count === 1 ? meta.label : meta.plural}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
-// Toggle chip used for filtering the instruction list by attachment type.
-function FilterChip({ active, onClick, label, count, dot }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-        active
-          ? 'bg-primary text-primary-foreground border-primary'
-          : 'bg-card text-muted-foreground border-border hover:bg-secondary'
-      }`}
-    >
-      {dot && <span className={`w-2 h-2 rounded-full ${dot}`} />}
-      {label}
-      <span className={active ? 'opacity-80' : 'opacity-60'}>{count}</span>
-    </button>
-  )
-}
 
 function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
   const [title, setTitle] = useState(instruction?.title || '')
@@ -162,8 +39,8 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
     setError(null)
     try {
       const payload = isEdit
-        ? { title: title.trim(), content }
-        : { organizationId, title: title.trim(), content }
+        ? { input: { title: title.trim(), content } }
+        : { organizationId, input: { title: title.trim(), content } }
 
       const response = isEdit
         ? await api.put(`/instructions/${instruction.id}`, payload)
@@ -200,6 +77,14 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
               <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
+
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
+            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              This instruction applies to <span className="font-medium text-foreground">every</span> company,
+              person and group in this organization automatically. There is no need to attach it to a specific entity.
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Title *</label>
@@ -267,14 +152,10 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
   )
 }
 
-function InstructionViewer({ instructionId, onClose, onChanged }) {
-  const { isAdmin } = useAuth()
+function InstructionViewer({ instructionId, onClose }) {
   const [instruction, setInstruction] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [entityType, setEntityType] = useState('company')
-  const [entityId, setEntityId] = useState('')
-  const [assigning, setAssigning] = useState(false)
 
   useEffect(() => {
     fetchOne()
@@ -287,55 +168,14 @@ function InstructionViewer({ instructionId, onClose, onChanged }) {
     try {
       const res = await api.get(`/instructions/${instructionId}`)
       if (!res.ok) throw new Error('Failed to load instruction')
-      setInstruction(await res.json())
+      const data = await res.json()
+      setInstruction(data.instruction || data)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
   }
-
-  const handleAssign = async (e) => {
-    e.preventDefault()
-    if (!entityId.trim()) return
-    setAssigning(true)
-    try {
-      const res = await api.post(`/instructions/${instructionId}/assign`, {
-        entityType,
-        entityId: entityId.trim(),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to assign')
-      }
-      setEntityId('')
-      fetchOne()
-      onChanged?.()
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setAssigning(false)
-    }
-  }
-
-  const handleUnassign = async (assignment) => {
-    try {
-      const res = await api.delete(`/instructions/${instructionId}/assign`, {
-        entityType: assignment.entityType || assignment.entity_type,
-        entityId: assignment.entityId || assignment.entity_id,
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to unassign')
-      }
-      fetchOne()
-      onChanged?.()
-    } catch (err) {
-      alert(err.message)
-    }
-  }
-
-  const assignments = instruction?.assignments || instruction?.assignedTo || []
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -360,89 +200,16 @@ function InstructionViewer({ instructionId, onClose, onChanged }) {
             </div>
           </div>
         ) : (
-          <div className="p-4 space-y-5">
-            {/* Content */}
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Content</h3>
-              <pre className="whitespace-pre-wrap break-words bg-muted/50 border border-border rounded-lg p-4 text-sm text-foreground font-mono max-h-80 overflow-y-auto">
-                {instruction?.content}
-              </pre>
+          <div className="p-4 space-y-4">
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
+              <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground">
+                Applied automatically to all companies, people and groups in this organization.
+              </p>
             </div>
-
-            {/* Assignments */}
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                Assigned to entities
-              </h3>
-              {assignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Not assigned to any entity yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {assignments.map((a, i) => {
-                    const type = a.entityType || a.entity_type
-                    const eid = a.entityId || a.entity_id
-                    const meta = ENTITY_META[type]
-                    const Icon = meta?.icon || Link2
-                    return (
-                      <span
-                        key={`${type}-${eid}-${i}`}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                          meta?.badge || 'bg-primary/10 text-primary'
-                        }`}
-                      >
-                        <Icon className="w-3 h-3" />
-                        <span className="font-semibold">{meta?.label || type}</span>
-                        <span className="opacity-70 font-mono">{eid}</span>
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleUnassign(a)}
-                            className="ml-0.5 rounded-full hover:bg-black/10 p-0.5 cursor-pointer"
-                            title="Unassign"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                      </span>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Assign form */}
-            {isAdmin && (
-              <form onSubmit={handleAssign} className="border-t border-border pt-4 space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Assign to a new entity</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={entityType}
-                    onChange={(e) => setEntityType(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    {ENTITY_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={entityId}
-                    onChange={(e) => setEntityId(e.target.value)}
-                    placeholder="Entity ID"
-                    className="flex-1 px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <button
-                    type="submit"
-                    disabled={assigning || !entityId.trim()}
-                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                  >
-                    {assigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                    Assign
-                  </button>
-                </div>
-              </form>
-            )}
+            <pre className="whitespace-pre-wrap break-words bg-muted/50 border border-border rounded-lg p-4 text-sm text-foreground font-mono max-h-[60vh] overflow-y-auto">
+              {instruction?.content}
+            </pre>
           </div>
         )}
       </div>
@@ -460,8 +227,6 @@ export default function OrgInstructions({ organizationId }) {
   const [viewId, setViewId] = useState(null)
   const [deleteItem, setDeleteItem] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('updated')
 
   useEffect(() => {
     fetchInstructions()
@@ -476,30 +241,12 @@ export default function OrgInstructions({ organizationId }) {
       if (!response.ok) throw new Error('Failed to fetch instructions')
       const data = await response.json()
       const list = Array.isArray(data) ? data : data.instructions || data.results || []
-
-      // The list endpoint may not include assignments. Fetch details in
-      // parallel for any item that is missing them so we can show tags.
-      const needsDetail = list.some(
-        (i) => !i.assignments && !i.assignedTo && !i.instructionAssignments
-      )
-      let enriched = list
-      if (needsDetail) {
-        enriched = await Promise.all(
-          list.map(async (item) => {
-            try {
-              const res = await api.get(`/instructions/${item.id}`)
-              if (!res.ok) return item
-              const detail = await res.json()
-              return { ...item, ...detail }
-            } catch {
-              return item
-            }
-          })
-        )
-      }
-
       setInstructions(
-        enriched.map((item) => ({ ...item, _assignments: normalizeAssignments(item) }))
+        [...list].sort((a, b) => {
+          const da = new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0)
+          const db = new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0)
+          return db - da
+        }),
       )
     } catch (err) {
       setError(err.message)
@@ -507,26 +254,6 @@ export default function OrgInstructions({ organizationId }) {
       setLoading(false)
     }
   }
-
-  const visibleInstructions = instructions
-    .filter((item) => {
-      const assignments = item._assignments || []
-      if (typeFilter === 'all') return true
-      if (typeFilter === 'unassigned') return assignments.length === 0
-      return assignments.some((a) => a.type === typeFilter)
-    })
-    .sort((a, b) => {
-      if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '')
-      if (sortBy === 'assigned')
-        return (b._assignments?.length || 0) - (a._assignments?.length || 0)
-      const da = new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0)
-      const db = new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0)
-      return db - da
-    })
-
-  // Per-type totals across the whole organization, for filter counts.
-  const totalsByType = countByType(instructions.flatMap((i) => i._assignments || []))
-  const unassignedCount = instructions.filter((i) => (i._assignments || []).length === 0).length
 
   const handleDelete = async () => {
     if (!deleteItem) return
@@ -548,11 +275,18 @@ export default function OrgInstructions({ organizationId }) {
 
   return (
     <div className="space-y-4">
+      <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
+        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+        <p className="text-sm text-muted-foreground">
+          These instructions form a single library for this organization. Every instruction here is
+          applied automatically to <span className="font-medium text-foreground">all</span> companies,
+          people and groups during analysis and content generation — no manual attaching needed.
+        </p>
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {visibleInstructions.length === instructions.length
-            ? `${instructions.length} instruction${instructions.length === 1 ? '' : 's'}`
-            : `${visibleInstructions.length} of ${instructions.length} instructions`}
+          {instructions.length} instruction{instructions.length === 1 ? '' : 's'}
         </p>
         {isAdmin && (
           <button
@@ -567,51 +301,6 @@ export default function OrgInstructions({ organizationId }) {
           </button>
         )}
       </div>
-
-      {/* Filter by attachment type + sort */}
-      {instructions.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <FilterChip
-              active={typeFilter === 'all'}
-              onClick={() => setTypeFilter('all')}
-              label="All"
-              count={instructions.length}
-            />
-            {ENTITY_TYPES.map((t) => (
-              <FilterChip
-                key={t.value}
-                active={typeFilter === t.value}
-                onClick={() => setTypeFilter(t.value)}
-                label={ENTITY_META[t.value].plural}
-                count={totalsByType[t.value] || 0}
-                dot={ENTITY_META[t.value].dot}
-              />
-            ))}
-            <FilterChip
-              active={typeFilter === 'unassigned'}
-              onClick={() => setTypeFilter('unassigned')}
-              label="Unattached"
-              count={unassignedCount}
-            />
-          </div>
-
-          <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <ArrowUpDown className="w-4 h-4" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-2 py-1.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
-            >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
@@ -640,20 +329,9 @@ export default function OrgInstructions({ organizationId }) {
             </button>
           )}
         </div>
-      ) : visibleInstructions.length === 0 ? (
-        <div className="bg-card rounded-xl border border-border p-10 text-center">
-          <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">No instructions match this filter.</p>
-          <button
-            onClick={() => setTypeFilter('all')}
-            className="mt-3 text-sm text-primary hover:underline cursor-pointer"
-          >
-            Clear filter
-          </button>
-        </div>
       ) : (
         <div className="space-y-3">
-          {visibleInstructions.map((item) => (
+          {instructions.map((item) => (
             <div
               key={item.id}
               onClick={() => setViewId(item.id)}
@@ -676,7 +354,6 @@ export default function OrgInstructions({ organizationId }) {
                   <p className="text-sm text-muted-foreground line-clamp-1">
                     {(item.content || '').slice(0, 120) || 'Empty document'}
                   </p>
-                  <InstructionTags assignments={item._assignments || []} />
                   <p className="text-xs text-muted-foreground">
                     Updated {formatDate(item.updated_at || item.updatedAt || item.created_at || item.createdAt)}
                   </p>
@@ -690,7 +367,7 @@ export default function OrgInstructions({ organizationId }) {
                     setViewId(item.id)
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                  title="View & attach"
+                  title="View"
                 >
                   <Eye className="w-4 h-4" />
                   Open
@@ -743,11 +420,7 @@ export default function OrgInstructions({ organizationId }) {
       )}
 
       {viewId && (
-        <InstructionViewer
-          instructionId={viewId}
-          onClose={() => setViewId(null)}
-          onChanged={fetchInstructions}
-        />
+        <InstructionViewer instructionId={viewId} onClose={() => setViewId(null)} />
       )}
 
       {deleteItem && (
@@ -756,7 +429,7 @@ export default function OrgInstructions({ organizationId }) {
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Instruction?</h3>
             <p className="text-muted-foreground mb-4">
               Deleting <span className="font-medium text-foreground">{deleteItem.title}</span> will
-              also remove all its entity assignments. This cannot be undone.
+              remove it from this organization&apos;s instruction library. This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button

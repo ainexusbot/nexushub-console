@@ -11,7 +11,14 @@ import {
   Building2,
   ArrowRight,
   Loader2,
+  Tag as TagIcon,
 } from 'lucide-react'
+import TagSelector from '../components/TagSelector'
+
+// Read the tags array off an organization regardless of the API field name.
+function orgTags(org) {
+  return org.tags || org.tagList || org.tag_list || []
+}
 
 function OrgModal({ org, onClose, onSave }) {
   const [formData, setFormData] = useState({
@@ -127,10 +134,26 @@ export default function OrganizationsPage() {
   const [editOrg, setEditOrg] = useState(null)
   const [deleteOrg, setDeleteOrg] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [tagFilter, setTagFilter] = useState('all')
 
   useEffect(() => {
     fetchOrganizations()
   }, [])
+
+  // Unique tags present across all organizations, for the filter bar.
+  const availableTags = Object.values(
+    organizations
+      .flatMap((org) => orgTags(org))
+      .reduce((acc, t) => {
+        if (t && t.id != null) acc[t.id] = t
+        return acc
+      }, {}),
+  )
+
+  const visibleOrganizations =
+    tagFilter === 'all'
+      ? organizations
+      : organizations.filter((org) => orgTags(org).some((t) => t.id === tagFilter))
 
   const fetchOrganizations = async () => {
     setLoading(true)
