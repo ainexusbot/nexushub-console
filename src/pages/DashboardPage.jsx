@@ -52,11 +52,13 @@ export default function DashboardPage() {
 
       if (orgsRes.ok) {
         const data = await orgsRes.json()
-        setOrganizations(Array.isArray(data) ? data : data.results || [])
+        setOrganizations(
+          Array.isArray(data) ? data : data.organizations || data.results || []
+        )
       }
       if (usersRes.ok) {
         const data = await usersRes.json()
-        setUsers(Array.isArray(data) ? data : data.results || [])
+        setUsers(Array.isArray(data) ? data : data.users || data.results || [])
       }
     } catch (err) {
       setError(err.message)

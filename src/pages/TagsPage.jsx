@@ -185,7 +185,7 @@ export default function TagsPage() {
       const response = await api.get(`/tags${query}`)
       if (!response.ok) throw new Error('Failed to fetch tags')
       const data = await response.json()
-      setTags(Array.isArray(data) ? data : [])
+      setTags(Array.isArray(data) ? data : data.tags || data.results || [])
     } catch (err) {
       setError(err.message)
     } finally {
