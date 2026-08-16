@@ -12,6 +12,11 @@ import {
   Loader2,
   Link2,
   Eye,
+  Building2,
+  User,
+  Mail,
+  BarChart3,
+  ArrowUpDown,
 } from 'lucide-react'
 
 const ENTITY_TYPES = [
@@ -20,6 +25,117 @@ const ENTITY_TYPES = [
   { value: 'email', label: 'Email' },
   { value: 'analysis', label: 'Analysis' },
 ]
+
+// Visual metadata for each entity type an instruction can be attached to.
+const ENTITY_META = {
+  company: {
+    label: 'Company',
+    plural: 'Companies',
+    icon: Building2,
+    badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+  person: {
+    label: 'Person',
+    plural: 'People',
+    icon: User,
+    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
+  },
+  email: {
+    label: 'Email',
+    plural: 'Emails',
+    icon: Mail,
+    badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    dot: 'bg-amber-500',
+  },
+  analysis: {
+    label: 'Analysis',
+    plural: 'Analyses',
+    icon: BarChart3,
+    badge: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+    dot: 'bg-violet-500',
+  },
+}
+
+// Normalize the various assignment shapes the API may return into { type, id }.
+function normalizeAssignments(item) {
+  const raw = item?.assignments || item?.assignedTo || item?.instructionAssignments || []
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((a) => ({
+      type: a.entityType || a.entity_type || a.type,
+      id: a.entityId || a.entity_id || a.id,
+    }))
+    .filter((a) => a.type)
+}
+
+// Count assignments per entity type.
+function countByType(assignments) {
+  return assignments.reduce((acc, a) => {
+    acc[a.type] = (acc[a.type] || 0) + 1
+    return acc
+  }, {})
+}
+
+const SORT_OPTIONS = [
+  { value: 'updated', label: 'Recently updated' },
+  { value: 'title', label: 'Title (A–Z)' },
+  { value: 'assigned', label: 'Most attached' },
+]
+
+// Tags showing which entity types an instruction is attached to.
+function InstructionTags({ assignments }) {
+  const counts = countByType(assignments)
+  const types = Object.keys(counts)
+
+  if (types.length === 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+        Not attached
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {ENTITY_TYPES.filter((t) => counts[t.value]).map((t) => {
+        const meta = ENTITY_META[t.value]
+        const Icon = meta.icon
+        const count = counts[t.value]
+        return (
+          <span
+            key={t.value}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${meta.badge}`}
+            title={`${count} ${count === 1 ? meta.label : meta.plural}`}
+          >
+            <Icon className="w-3 h-3" />
+            {count} {count === 1 ? meta.label : meta.plural}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// Toggle chip used for filtering the instruction list by attachment type.
+function FilterChip({ active, onClick, label, count, dot }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+        active
+          ? 'bg-primary text-primary-foreground border-primary'
+          : 'bg-card text-muted-foreground border-border hover:bg-secondary'
+      }`}
+    >
+      {dot && <span className={`w-2 h-2 rounded-full ${dot}`} />}
+      {label}
+      <span className={active ? 'opacity-80' : 'opacity-60'}>{count}</span>
+    </button>
+  )
+}
 
 function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
   const [title, setTitle] = useState(instruction?.title || '')
@@ -265,17 +381,22 @@ function InstructionViewer({ instructionId, onClose, onChanged }) {
                   {assignments.map((a, i) => {
                     const type = a.entityType || a.entity_type
                     const eid = a.entityId || a.entity_id
+                    const meta = ENTITY_META[type]
+                    const Icon = meta?.icon || Link2
                     return (
                       <span
                         key={`${type}-${eid}-${i}`}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                          meta?.badge || 'bg-primary/10 text-primary'
+                        }`}
                       >
-                        <Link2 className="w-3 h-3" />
-                        {type}: {eid}
+                        <Icon className="w-3 h-3" />
+                        <span className="font-semibold">{meta?.label || type}</span>
+                        <span className="opacity-70 font-mono">{eid}</span>
                         {isAdmin && (
                           <button
                             onClick={() => handleUnassign(a)}
-                            className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"
+                            className="ml-0.5 rounded-full hover:bg-black/10 p-0.5 cursor-pointer"
                             title="Unassign"
                           >
                             <X className="w-3 h-3" />
@@ -339,6 +460,8 @@ export default function OrgInstructions({ organizationId }) {
   const [viewId, setViewId] = useState(null)
   const [deleteItem, setDeleteItem] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('updated')
 
   useEffect(() => {
     fetchInstructions()
@@ -352,8 +475,31 @@ export default function OrgInstructions({ organizationId }) {
       const response = await api.get(`/instructions?organizationId=${organizationId}`)
       if (!response.ok) throw new Error('Failed to fetch instructions')
       const data = await response.json()
+      const list = Array.isArray(data) ? data : data.instructions || data.results || []
+
+      // The list endpoint may not include assignments. Fetch details in
+      // parallel for any item that is missing them so we can show tags.
+      const needsDetail = list.some(
+        (i) => !i.assignments && !i.assignedTo && !i.instructionAssignments
+      )
+      let enriched = list
+      if (needsDetail) {
+        enriched = await Promise.all(
+          list.map(async (item) => {
+            try {
+              const res = await api.get(`/instructions/${item.id}`)
+              if (!res.ok) return item
+              const detail = await res.json()
+              return { ...item, ...detail }
+            } catch {
+              return item
+            }
+          })
+        )
+      }
+
       setInstructions(
-        Array.isArray(data) ? data : data.instructions || data.results || []
+        enriched.map((item) => ({ ...item, _assignments: normalizeAssignments(item) }))
       )
     } catch (err) {
       setError(err.message)
@@ -361,6 +507,26 @@ export default function OrgInstructions({ organizationId }) {
       setLoading(false)
     }
   }
+
+  const visibleInstructions = instructions
+    .filter((item) => {
+      const assignments = item._assignments || []
+      if (typeFilter === 'all') return true
+      if (typeFilter === 'unassigned') return assignments.length === 0
+      return assignments.some((a) => a.type === typeFilter)
+    })
+    .sort((a, b) => {
+      if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '')
+      if (sortBy === 'assigned')
+        return (b._assignments?.length || 0) - (a._assignments?.length || 0)
+      const da = new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0)
+      const db = new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0)
+      return db - da
+    })
+
+  // Per-type totals across the whole organization, for filter counts.
+  const totalsByType = countByType(instructions.flatMap((i) => i._assignments || []))
+  const unassignedCount = instructions.filter((i) => (i._assignments || []).length === 0).length
 
   const handleDelete = async () => {
     if (!deleteItem) return
@@ -384,7 +550,9 @@ export default function OrgInstructions({ organizationId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {instructions.length} instruction{instructions.length === 1 ? '' : 's'}
+          {visibleInstructions.length === instructions.length
+            ? `${instructions.length} instruction${instructions.length === 1 ? '' : 's'}`
+            : `${visibleInstructions.length} of ${instructions.length} instructions`}
         </p>
         {isAdmin && (
           <button
@@ -399,6 +567,51 @@ export default function OrgInstructions({ organizationId }) {
           </button>
         )}
       </div>
+
+      {/* Filter by attachment type + sort */}
+      {instructions.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <FilterChip
+              active={typeFilter === 'all'}
+              onClick={() => setTypeFilter('all')}
+              label="All"
+              count={instructions.length}
+            />
+            {ENTITY_TYPES.map((t) => (
+              <FilterChip
+                key={t.value}
+                active={typeFilter === t.value}
+                onClick={() => setTypeFilter(t.value)}
+                label={ENTITY_META[t.value].plural}
+                count={totalsByType[t.value] || 0}
+                dot={ENTITY_META[t.value].dot}
+              />
+            ))}
+            <FilterChip
+              active={typeFilter === 'unassigned'}
+              onClick={() => setTypeFilter('unassigned')}
+              label="Unattached"
+              count={unassignedCount}
+            />
+          </div>
+
+          <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <ArrowUpDown className="w-4 h-4" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-2 py-1.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
@@ -427,28 +640,44 @@ export default function OrgInstructions({ organizationId }) {
             </button>
           )}
         </div>
+      ) : visibleInstructions.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-10 text-center">
+          <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground">No instructions match this filter.</p>
+          <button
+            onClick={() => setTypeFilter('all')}
+            className="mt-3 text-sm text-primary hover:underline cursor-pointer"
+          >
+            Clear filter
+          </button>
+        </div>
       ) : (
         <div className="space-y-3">
-          {instructions.map((item) => (
+          {visibleInstructions.map((item) => (
             <div
               key={item.id}
-              className="bg-card rounded-xl border border-border p-4 flex items-start justify-between gap-4 hover:border-primary/50 transition-colors"
+              onClick={() => setViewId(item.id)}
+              className="bg-card rounded-xl border border-border p-4 flex items-start justify-between gap-4 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer"
             >
               <div className="flex items-start gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5 text-primary" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 space-y-1.5">
                   <button
-                    onClick={() => setViewId(item.id)}
-                    className="font-medium text-foreground hover:text-primary transition-colors text-left"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setViewId(item.id)
+                    }}
+                    className="font-medium text-foreground hover:text-primary hover:underline transition-colors text-left cursor-pointer"
                   >
                     {item.title}
                   </button>
                   <p className="text-sm text-muted-foreground line-clamp-1">
                     {(item.content || '').slice(0, 120) || 'Empty document'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <InstructionTags assignments={item._assignments || []} />
+                  <p className="text-xs text-muted-foreground">
                     Updated {formatDate(item.updated_at || item.updatedAt || item.created_at || item.createdAt)}
                   </p>
                 </div>
@@ -456,27 +685,35 @@ export default function OrgInstructions({ organizationId }) {
 
               <div className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => setViewId(item.id)}
-                  className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                  title="View & assign"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setViewId(item.id)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                  title="View & attach"
                 >
-                  <Eye className="w-4 h-4 text-muted-foreground" />
+                  <Eye className="w-4 h-4" />
+                  Open
                 </button>
                 {isAdmin && (
                   <>
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation()
                         setEditInstruction(item)
                         setShowEditor(true)
                       }}
-                      className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                      className="p-2 hover:bg-secondary rounded-lg transition-colors cursor-pointer"
                       title="Edit"
                     >
                       <Edit2 className="w-4 h-4 text-muted-foreground" />
                     </button>
                     <button
-                      onClick={() => setDeleteItem(item)}
-                      className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteItem(item)
+                      }}
+                      className="p-2 hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
                       title="Delete"
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
