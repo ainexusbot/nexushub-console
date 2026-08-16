@@ -51,10 +51,11 @@ function TagModal({ tag, onClose, onSave }) {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
+        const message = data.error || data.detail || data.message
         if (response.status === 409) {
-          throw new Error(data.detail || 'A tag with this name already exists')
+          throw new Error(message || 'A tag with this name already exists')
         }
-        throw new Error(data.detail || 'Failed to save tag')
+        throw new Error(message || 'Failed to save tag')
       }
 
       onSave()

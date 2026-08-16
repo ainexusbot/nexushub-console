@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { api, formatDate } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -14,6 +14,10 @@ import {
   Briefcase,
   UserCog,
   Loader2,
+  BadgeCheck,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
 const ROLE_META = {
@@ -37,6 +41,51 @@ function RoleBadge({ role }) {
       <Icon className="w-3 h-3" />
       {meta.label}
     </span>
+  )
+}
+
+function VerifiedBadge({ verified }) {
+  if (verified) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
+        <BadgeCheck className="w-3 h-3" />
+        Verified
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+      <Clock className="w-3 h-3" />
+      Pending
+    </span>
+  )
+}
+
+function UserAvatar({ user, name }) {
+  const avatarUrl = user.avatarUrl || user.avatar_url
+  const initials =
+    (name && name !== '—'
+      ? name
+          .split(' ')
+          .map((part) => part[0])
+          .slice(0, 2)
+          .join('')
+      : (user.email || '?')[0]
+    ).toUpperCase()
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl || '/placeholder.svg'}
+        alt={name !== '—' ? name : user.email}
+        className="w-9 h-9 rounded-full object-cover shrink-0"
+      />
+    )
+  }
+  return (
+    <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold shrink-0">
+      {initials}
+    </div>
   )
 }
 
@@ -206,29 +255,66 @@ function RegisterModal({ onClose, onSave }) {
   )
 }
 
+const PAGE_SIZE = 25
+
 export default function UsersPage() {
   const { user: currentUser, isAdmin } = useAuth()
   const [users, setUsers] = useState([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [page, setPage] = useState(0)
+
+  // Debounce the search input so we don't hit the API on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Reset to the first page whenever the filters change
+  useEffect(() => {
+    setPage(0)
+  }, [debouncedSearch, roleFilter])
 
   useEffect(() => {
     fetchUsers()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, roleFilter, page])
 
   const fetchUsers = async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.get('/users')
+      const params = new URLSearchParams()
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      if (roleFilter) params.set('role', roleFilter)
+      params.set('limit', String(PAGE_SIZE))
+      params.set('offset', String(page * PAGE_SIZE))
+
+      const response = await api.get(`/users?${params.toString()}`)
       if (!response.ok) throw new Error('Failed to fetch users')
       const data = await response.json()
-      setUsers(Array.isArray(data) ? data : data.results || [])
+      console.log('[v0] users response:', data)
+
+      // Backend returns { users, total }; keep fallbacks for older/nested shapes
+      const list = Array.isArray(data)
+        ? data
+        : data.users || data.results || data.data?.users || data.data || []
+      console.log('[v0] parsed users list length:', Array.isArray(list) ? list.length : 'not-array')
+      setUsers(Array.isArray(list) ? list : [])
+      setTotal(
+        typeof data.total === 'number'
+          ? data.total
+          : Number(data.total) || (Array.isArray(list) ? list.length : 0),
+      )
     } catch (err) {
       setError(err.message)
+      setUsers([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
@@ -241,17 +327,9 @@ export default function UsersPage() {
     return name || '—'
   }
 
-  const filtered = useMemo(() => {
-    return users.filter((u) => {
-      if (roleFilter && u.role !== roleFilter) return false
-      if (search) {
-        const q = search.toLowerCase()
-        const haystack = `${u.email || ''} ${fullName(u)}`.toLowerCase()
-        if (!haystack.includes(q)) return false
-      }
-      return true
-    })
-  }, [users, roleFilter, search])
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1
+  const rangeEnd = Math.min(total, page * PAGE_SIZE + users.length)
 
   return (
     <div className="space-y-6">
@@ -317,12 +395,14 @@ export default function UsersPage() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : users.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">No Users Found</h3>
           <p className="text-muted-foreground">
-            {search || roleFilter ? 'Try adjusting your filters' : 'Add a user to get started'}
+            {debouncedSearch || roleFilter
+              ? 'Try adjusting your filters'
+              : 'Add a user to get started'}
           </p>
         </div>
       ) : (
@@ -333,27 +413,38 @@ export default function UsersPage() {
                 <tr className="border-b border-border bg-muted/50">
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">User</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Role</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Created</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => {
+                {users.map((u) => {
                   const isSelf = currentUser?.id === u.id
+                  const name = fullName(u)
+                  const verified = u.isVerified ?? u.is_verified
                   return (
                     <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium text-foreground">{u.email}</div>
-                          {isSelf && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary uppercase">
-                              You
-                            </span>
-                          )}
+                        <div className="flex items-center gap-3">
+                          <UserAvatar user={u} name={name} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium text-foreground truncate">{u.email}</div>
+                              {isSelf && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary uppercase">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground">{name}</div>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">{fullName(u)}</div>
                       </td>
                       <td className="px-4 py-3">
                         <RoleBadge role={u.role} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <VerifiedBadge verified={verified} />
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {formatDate(u.created_at || u.createdAt)}
@@ -364,6 +455,35 @@ export default function UsersPage() {
               </tbody>
             </table>
           </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-border">
+            <p className="text-sm text-muted-foreground">
+              {`Showing ${rangeStart}-${rangeEnd} of ${total}`}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Prev
+              </button>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {`Page ${page + 1} of ${totalPages}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
+                disabled={page + 1 >= totalPages}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -372,7 +492,11 @@ export default function UsersPage() {
           onClose={() => setShowModal(false)}
           onSave={() => {
             setShowModal(false)
-            fetchUsers()
+            if (page === 0) {
+              fetchUsers()
+            } else {
+              setPage(0)
+            }
           }}
         />
       )}

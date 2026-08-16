@@ -139,7 +139,9 @@ export default function OrganizationsPage() {
       const response = await api.get('/organizations')
       if (!response.ok) throw new Error('Failed to fetch organizations')
       const data = await response.json()
-      setOrganizations(Array.isArray(data) ? data : data.results || [])
+      setOrganizations(
+        Array.isArray(data) ? data : data.organizations || data.results || [],
+      )
     } catch (err) {
       setError(err.message)
     } finally {
