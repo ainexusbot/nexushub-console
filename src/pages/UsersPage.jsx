@@ -298,11 +298,19 @@ export default function UsersPage() {
       const response = await api.get(`/users?${params.toString()}`)
       if (!response.ok) throw new Error('Failed to fetch users')
       const data = await response.json()
+      console.log('[v0] users response:', data)
 
-      // Backend returns { users, total }; keep fallbacks for older shapes
-      const list = Array.isArray(data) ? data : data.users || data.results || []
-      setUsers(list)
-      setTotal(typeof data.total === 'number' ? data.total : list.length)
+      // Backend returns { users, total }; keep fallbacks for older/nested shapes
+      const list = Array.isArray(data)
+        ? data
+        : data.users || data.results || data.data?.users || data.data || []
+      console.log('[v0] parsed users list length:', Array.isArray(list) ? list.length : 'not-array')
+      setUsers(Array.isArray(list) ? list : [])
+      setTotal(
+        typeof data.total === 'number'
+          ? data.total
+          : Number(data.total) || (Array.isArray(list) ? list.length : 0),
+      )
     } catch (err) {
       setError(err.message)
       setUsers([])
