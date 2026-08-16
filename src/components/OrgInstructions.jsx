@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
-import { api, formatDate } from '../utils/api'
-import { useAuth } from '../context/AuthContext'
+import { useState, useEffect, useRef } from "react";
+import { api, formatDate } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 import {
   Plus,
   Edit2,
@@ -12,58 +12,60 @@ import {
   Loader2,
   Eye,
   Info,
-} from 'lucide-react'
+} from "lucide-react";
 
 function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
-  const [title, setTitle] = useState(instruction?.title || '')
-  const [content, setContent] = useState(instruction?.content || '')
-  const [fileName, setFileName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const fileInputRef = useRef(null)
+  const [title, setTitle] = useState(instruction?.title || "");
+  const [content, setContent] = useState(instruction?.content || "");
+  const [fileName, setFileName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
 
-  const isEdit = !!instruction
+  const isEdit = !!instruction;
 
   const handleFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const text = await file.text()
-    setContent(text)
-    setFileName(file.name)
-    if (!title) setTitle(file.name.replace(/\.md$/i, ''))
-  }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    setContent(text);
+    setFileName(file.name);
+    if (!title) setTitle(file.name.replace(/\.md$/i, ""));
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
     try {
       const payload = isEdit
         ? { input: { title: title.trim(), content } }
-        : { organizationId, input: { title: title.trim(), content } }
+        : { organizationId, input: { title: title.trim(), content } };
 
       const response = isEdit
         ? await api.put(`/instructions/${instruction.id}`, payload)
-        : await api.post('/instructions', payload)
+        : await api.post("/instructions", payload);
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || data.message || 'Failed to save instruction')
+        const data = await response.json().catch(() => ({}));
+        throw new Error(
+          data.error || data.message || "Failed to save instruction",
+        );
       }
-      onSave()
+      onSave();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-card rounded-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">
-            {isEdit ? 'Edit Instruction' : 'New Instruction'}
+            {isEdit ? "Edit Instruction" : "New Instruction"}
           </h2>
           <button onClick={onClose} className="p-1 hover:bg-secondary rounded">
             <X className="w-5 h-5" />
@@ -81,13 +83,17 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
           <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
             <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              This instruction applies to <span className="font-medium text-foreground">every</span> company,
-              person and group in this organization automatically. There is no need to attach it to a specific entity.
+              This instruction applies to{" "}
+              <span className="font-medium text-foreground">every</span>{" "}
+              company, person and group in this organization automatically.
+              There is no need to attach it to a specific entity.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Title *</label>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Title *
+            </label>
             <input
               type="text"
               value={title}
@@ -100,7 +106,9 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-foreground">Content (Markdown) *</label>
+              <label className="block text-sm font-medium text-foreground">
+                Content (Markdown) *
+              </label>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -117,7 +125,9 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
               />
             </div>
             {fileName && (
-              <p className="text-xs text-muted-foreground mb-1">Loaded from: {fileName}</p>
+              <p className="text-xs text-muted-foreground mb-1">
+                Loaded from: {fileName}
+              </p>
             )}
             <textarea
               value={content}
@@ -143,48 +153,51 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
               className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? "Saving..." : "Save"}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }
 
 function InstructionViewer({ instructionId, onClose }) {
-  const [instruction, setInstruction] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [instruction, setInstruction] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchOne()
+    fetchOne();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instructionId])
+  }, [instructionId]);
 
   const fetchOne = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const res = await api.get(`/instructions/${instructionId}`)
-      if (!res.ok) throw new Error('Failed to load instruction')
-      const data = await res.json()
-      setInstruction(data.instruction || data)
+      const res = await api.get(`/instructions/${instructionId}`);
+      if (!res.ok) throw new Error("Failed to load instruction");
+      const data = await res.json();
+      setInstruction(data.instruction || data);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-card rounded-xl border border-border w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card">
           <h2 className="text-lg font-semibold text-foreground truncate pr-4">
-            {instruction?.title || 'Instruction'}
+            {instruction?.title || "Instruction"}
           </h2>
-          <button onClick={onClose} className="p-1 hover:bg-secondary rounded shrink-0">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-secondary rounded shrink-0"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -204,7 +217,8 @@ function InstructionViewer({ instructionId, onClose }) {
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
               <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground">
-                Applied automatically to all companies, people and groups in this organization.
+                Applied automatically to all companies, people and groups in
+                this organization.
               </p>
             </div>
             <pre className="whitespace-pre-wrap break-words bg-muted/50 border border-border rounded-lg p-4 text-sm text-foreground font-mono max-h-[60vh] overflow-y-auto">
@@ -214,85 +228,96 @@ function InstructionViewer({ instructionId, onClose }) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 export default function OrgInstructions({ organizationId }) {
-  const { isAdmin } = useAuth()
-  const [instructions, setInstructions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [showEditor, setShowEditor] = useState(false)
-  const [editInstruction, setEditInstruction] = useState(null)
-  const [viewId, setViewId] = useState(null)
-  const [deleteItem, setDeleteItem] = useState(null)
-  const [deleting, setDeleting] = useState(false)
+  const { isAdmin } = useAuth();
+  const [instructions, setInstructions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editInstruction, setEditInstruction] = useState(null);
+  const [viewId, setViewId] = useState(null);
+  const [deleteItem, setDeleteItem] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    fetchInstructions()
+    fetchInstructions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId])
+  }, [organizationId]);
 
   const fetchInstructions = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const response = await api.get(`/instructions?organizationId=${organizationId}`)
-      if (!response.ok) throw new Error('Failed to fetch instructions')
-      const data = await response.json()
-      const list = Array.isArray(data) ? data : data.instructions || data.results || []
+      const response = await api.get(
+        `/instructions?organizationId=${organizationId}`,
+      );
+      if (!response.ok) throw new Error("Failed to fetch instructions");
+      const data = await response.json();
+      const list = Array.isArray(data)
+        ? data
+        : data.instructions || data.results || [];
       setInstructions(
         [...list].sort((a, b) => {
-          const da = new Date(a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0)
-          const db = new Date(b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0)
-          return db - da
+          const da = new Date(
+            a.updated_at || a.updatedAt || a.created_at || a.createdAt || 0,
+          );
+          const db = new Date(
+            b.updated_at || b.updatedAt || b.created_at || b.createdAt || 0,
+          );
+          return db - da;
         }),
-      )
+      );
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleDelete = async () => {
-    if (!deleteItem) return
-    setDeleting(true)
+    if (!deleteItem) return;
+    setDeleting(true);
     try {
-      const response = await api.delete(`/instructions/${deleteItem.id}`)
+      const response = await api.delete(`/instructions/${deleteItem.id}`);
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to delete instruction')
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete instruction");
       }
-      setDeleteItem(null)
-      fetchInstructions()
+      setDeleteItem(null);
+      fetchInstructions();
     } catch (err) {
-      alert(err.message)
+      alert(err.message);
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-4">
       <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
-          These instructions form a single library for this organization. Every instruction here is
-          applied automatically to <span className="font-medium text-foreground">all</span> companies,
-          people and groups during analysis and content generation — no manual attaching needed.
+          These instructions form a single library for this organization. Every
+          instruction here is applied automatically to{" "}
+          <span className="font-medium text-foreground">all</span> companies,
+          people and groups during analysis and content generation — no manual
+          attaching needed.
         </p>
       </div>
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {instructions.length} instruction{instructions.length === 1 ? '' : 's'}
+          {instructions.length} instruction
+          {instructions.length === 1 ? "" : "s"}
         </p>
         {isAdmin && (
           <button
             onClick={() => {
-              setEditInstruction(null)
-              setShowEditor(true)
+              setEditInstruction(null);
+              setShowEditor(true);
             }}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm"
           >
@@ -319,8 +344,8 @@ export default function OrgInstructions({ organizationId }) {
           {isAdmin && (
             <button
               onClick={() => {
-                setEditInstruction(null)
-                setShowEditor(true)
+                setEditInstruction(null);
+                setShowEditor(true);
               }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
@@ -344,18 +369,24 @@ export default function OrgInstructions({ organizationId }) {
                 <div className="min-w-0 space-y-1.5">
                   <button
                     onClick={(e) => {
-                      e.stopPropagation()
-                      setViewId(item.id)
+                      e.stopPropagation();
+                      setViewId(item.id);
                     }}
                     className="font-medium text-foreground hover:text-primary hover:underline transition-colors text-left cursor-pointer"
                   >
                     {item.title}
                   </button>
                   <p className="text-sm text-muted-foreground line-clamp-1">
-                    {(item.content || '').slice(0, 120) || 'Empty document'}
+                    {(item.content || "").slice(0, 120) || "Empty document"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Updated {formatDate(item.updated_at || item.updatedAt || item.created_at || item.createdAt)}
+                    Updated{" "}
+                    {formatDate(
+                      item.updated_at ||
+                        item.updatedAt ||
+                        item.created_at ||
+                        item.createdAt,
+                    )}
                   </p>
                 </div>
               </div>
@@ -363,8 +394,8 @@ export default function OrgInstructions({ organizationId }) {
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={(e) => {
-                    e.stopPropagation()
-                    setViewId(item.id)
+                    e.stopPropagation();
+                    setViewId(item.id);
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-foreground hover:bg-secondary transition-colors cursor-pointer"
                   title="View"
@@ -376,9 +407,9 @@ export default function OrgInstructions({ organizationId }) {
                   <>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation()
-                        setEditInstruction(item)
-                        setShowEditor(true)
+                        e.stopPropagation();
+                        setEditInstruction(item);
+                        setShowEditor(true);
                       }}
                       className="p-2 hover:bg-secondary rounded-lg transition-colors cursor-pointer"
                       title="Edit"
@@ -387,8 +418,8 @@ export default function OrgInstructions({ organizationId }) {
                     </button>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation()
-                        setDeleteItem(item)
+                        e.stopPropagation();
+                        setDeleteItem(item);
                       }}
                       className="p-2 hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
                       title="Delete"
@@ -408,28 +439,37 @@ export default function OrgInstructions({ organizationId }) {
           organizationId={organizationId}
           instruction={editInstruction}
           onClose={() => {
-            setShowEditor(false)
-            setEditInstruction(null)
+            setShowEditor(false);
+            setEditInstruction(null);
           }}
           onSave={() => {
-            setShowEditor(false)
-            setEditInstruction(null)
-            fetchInstructions()
+            setShowEditor(false);
+            setEditInstruction(null);
+            fetchInstructions();
           }}
         />
       )}
 
       {viewId && (
-        <InstructionViewer instructionId={viewId} onClose={() => setViewId(null)} />
+        <InstructionViewer
+          instructionId={viewId}
+          onClose={() => setViewId(null)}
+        />
       )}
 
       {deleteItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-xl border border-border p-6 w-full max-w-sm">
-            <h3 className="text-lg font-semibold text-foreground mb-2">Delete Instruction?</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Delete Instruction?
+            </h3>
             <p className="text-muted-foreground mb-4">
-              Deleting <span className="font-medium text-foreground">{deleteItem.title}</span> will
-              remove it from this organization&apos;s instruction library. This cannot be undone.
+              Deleting{" "}
+              <span className="font-medium text-foreground">
+                {deleteItem.title}
+              </span>{" "}
+              will remove it from this organization&apos;s instruction library.
+              This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
@@ -443,12 +483,12 @@ export default function OrgInstructions({ organizationId }) {
                 disabled={deleting}
                 className="flex-1 px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
               >
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
