@@ -352,7 +352,9 @@ export default function OrgInstructions({ organizationId }) {
       const response = await api.get(`/instructions?organizationId=${organizationId}`)
       if (!response.ok) throw new Error('Failed to fetch instructions')
       const data = await response.json()
-      setInstructions(Array.isArray(data) ? data : data.results || [])
+      setInstructions(
+        Array.isArray(data) ? data : data.instructions || data.results || []
+      )
     } catch (err) {
       setError(err.message)
     } finally {

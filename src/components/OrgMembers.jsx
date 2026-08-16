@@ -40,7 +40,9 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
         const res = await api.get('/users')
         if (res.ok) {
           const data = await res.json()
-          const list = Array.isArray(data) ? data : data.results || []
+          const list = Array.isArray(data)
+            ? data
+            : data.users || data.results || []
           setUsers(list.filter((u) => !existingIds.includes(u.id)))
         }
       } catch {
@@ -186,7 +188,9 @@ export default function OrgMembers({ organizationId }) {
       const response = await api.get(`/organizations/${organizationId}/members`)
       if (!response.ok) throw new Error('Failed to fetch members')
       const data = await response.json()
-      setMembers(Array.isArray(data) ? data : data.results || [])
+      setMembers(
+        Array.isArray(data) ? data : data.members || data.results || []
+      )
     } catch (err) {
       setError(err.message)
     } finally {
@@ -269,9 +273,11 @@ export default function OrgMembers({ organizationId }) {
                     <tr key={mid} className="border-b border-border last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground">{m.email || mid}</div>
-                        {(m.first_name || m.last_name) && (
+                        {(m.firstName || m.first_name || m.lastName || m.last_name) && (
                           <div className="text-sm text-muted-foreground">
-                            {[m.first_name, m.last_name].filter(Boolean).join(' ')}
+                            {[m.firstName || m.first_name, m.lastName || m.last_name]
+                              .filter(Boolean)
+                              .join(' ')}
                           </div>
                         )}
                       </td>
