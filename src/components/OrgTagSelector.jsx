@@ -53,13 +53,17 @@ export default function OrgTagSelector({ organizationId, tags = [], onChange, ca
   }
 
   const toggleTag = async (tag) => {
+    if (!organizationId) {
+      setError('Save the organization before assigning tags.')
+      return
+    }
     const isAssigned = assignedIds.has(tag.id)
     setBusyId(tag.id)
     setError(null)
     try {
       const response = isAssigned
         ? await api.delete(`/organizations/${organizationId}/tags/${tag.id}`)
-        : await api.post(`/organizations/${organizationId}/tags`, { tagId: tag.id })
+        : await api.post(`/organizations/${organizationId}/tags/${tag.id}`)
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.error || data.message || 'Failed to update tags')
