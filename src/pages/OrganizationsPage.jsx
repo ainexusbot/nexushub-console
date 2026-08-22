@@ -495,7 +495,12 @@ export default function OrganizationsPage() {
                   )}
                 </div>
 
-                <h3 className="font-semibold text-foreground text-lg">{org.name}</h3>
+                <h3
+                  onClick={() => navigate(`/organizations/${org.id}`)}
+                  className="font-semibold text-foreground text-lg cursor-pointer hover:text-primary transition-colors"
+                >
+                  {org.name}
+                </h3>
                 <p className="text-sm text-muted-foreground mt-1 flex-1 line-clamp-2">
                   {org.description || 'No description'}
                 </p>
@@ -522,7 +527,7 @@ export default function OrganizationsPage() {
                   </span>
                   <button
                     onClick={() => navigate(`/organizations/${org.id}`)}
-                    className="text-sm text-primary hover:text-primary/80 inline-flex items-center gap-1 font-medium"
+                    className="text-sm text-primary hover:text-primary/80 inline-flex items-center gap-1 font-medium cursor-pointer"
                   >
                     Open <ArrowRight className="w-4 h-4" />
                   </button>
