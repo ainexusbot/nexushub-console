@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, formatDate } from '../utils/api'
-import { ArrowLeft, Building2, Users, FileText, Tag } from 'lucide-react'
+import { ArrowLeft, Building2, Users, FileText, Tag, LayoutGrid } from 'lucide-react'
 import OrgMembers from '../components/OrgMembers'
 import OrgInstructions from '../components/OrgInstructions'
 import OrgInstructionTypes from '../components/OrgInstructionTypes'
+import OrgContentTypes from '../components/OrgContentTypes'
 import OrgTagSelector from '../components/OrgTagSelector'
 import { useAuth } from '../context/AuthContext'
 
@@ -12,6 +13,7 @@ const TABS = [
   { id: 'members', label: 'Members', icon: Users },
   { id: 'instructions', label: 'Instructions', icon: FileText },
   { id: 'types', label: 'Instruction Types', icon: Tag },
+  { id: 'content-types', label: 'Content Buttons', icon: LayoutGrid },
 ]
 
 export default function OrganizationDetailPage() {
@@ -119,6 +121,7 @@ export default function OrganizationDetailPage() {
       {tab === 'members' && <OrgMembers organizationId={id} />}
       {tab === 'instructions' && <OrgInstructions organizationId={id} />}
       {tab === 'types' && <OrgInstructionTypes organizationId={id} />}
+      {tab === 'content-types' && <OrgContentTypes organizationId={id} />}
     </div>
   )
 }
