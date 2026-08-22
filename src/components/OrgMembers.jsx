@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -33,6 +34,7 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
   const [orgRole, setOrgRole] = useState('member')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [conflictOrgId, setConflictOrgId] = useState(null)
 
   useEffect(() => {
     const load = async () => {
@@ -59,6 +61,7 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
     if (!userId) return
     setLoading(true)
     setError(null)
+    setConflictOrgId(null)
     try {
       const response = await api.post(`/organizations/${organizationId}/members`, {
         userId,
@@ -66,6 +69,10 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
+        // 409 = user already belongs to another organization
+        if (response.status === 409 && data.existingOrganizationId) {
+          setConflictOrgId(data.existingOrganizationId)
+        }
         throw new Error(data.error || data.message || 'Failed to add member')
       }
       onSave()
@@ -90,7 +97,18 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
           {error && (
             <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
-              <p className="text-sm text-destructive">{error}</p>
+              <div className="text-sm text-destructive">
+                <p>{error}</p>
+                {conflictOrgId && (
+                  <Link
+                    to={`/organizations/${conflictOrgId}`}
+                    onClick={onClose}
+                    className="inline-block mt-1 font-medium underline hover:no-underline"
+                  >
+                    Go to their organization
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 
@@ -108,13 +126,23 @@ function AddMemberModal({ organizationId, existingIds, onClose, onSave }) {
                 className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select a user...</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.email} {u.role ? `(${u.role})` : ''}
-                  </option>
-                ))}
+                {users.map((u) => {
+                  // A user may belong to only one organization. Users already in a
+                  // different organization can't be selected until they're removed there.
+                  const inOtherOrg = u.organization && u.organization.id !== organizationId
+                  return (
+                    <option key={u.id} value={u.id} disabled={inOtherOrg}>
+                      {u.email} {u.role ? `(${u.role})` : ''}
+                      {inOtherOrg ? ` — already in ${u.organization.name}` : ''}
+                    </option>
+                  )
+                })}
               </select>
             )}
+            <p className="text-xs text-muted-foreground mt-1">
+              Users already assigned to another organization are disabled. Remove them
+              from that organization first.
+            </p>
             {!loadingUsers && users.length === 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 All users are already members.

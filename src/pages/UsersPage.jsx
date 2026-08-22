@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Pencil,
   Trash2,
+  Building2,
 } from 'lucide-react'
 
 const ROLE_META = {
@@ -59,6 +60,23 @@ function VerifiedBadge({ verified }) {
     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
       <Clock className="w-3 h-3" />
       Pending
+    </span>
+  )
+}
+
+function OrgBadge({ organization }) {
+  if (!organization) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+        <Building2 className="w-3 h-3" />
+        No organization
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+      <Building2 className="w-3 h-3" />
+      {organization.name}
     </span>
   )
 }
@@ -659,6 +677,7 @@ export default function UsersPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">User</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Organization</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Role</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Created</th>
@@ -689,6 +708,9 @@ export default function UsersPage() {
                             <div className="text-sm text-muted-foreground">{name}</div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <OrgBadge organization={u.organization} />
                       </td>
                       <td className="px-4 py-3">
                         <RoleBadge role={u.role} />
