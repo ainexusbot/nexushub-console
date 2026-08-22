@@ -5,6 +5,8 @@ import { ArrowLeft, Building2, Users, FileText, Tag } from 'lucide-react'
 import OrgMembers from '../components/OrgMembers'
 import OrgInstructions from '../components/OrgInstructions'
 import OrgInstructionTypes from '../components/OrgInstructionTypes'
+import OrgTagSelector from '../components/OrgTagSelector'
+import { useAuth } from '../context/AuthContext'
 
 const TABS = [
   { id: 'members', label: 'Members', icon: Users },
@@ -14,6 +16,7 @@ const TABS = [
 
 export default function OrganizationDetailPage() {
   const { id } = useParams()
+  const { isAdmin } = useAuth()
   const [org, setOrg] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -79,7 +82,15 @@ export default function OrganizationDetailPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">{org.name}</h1>
           <p className="text-muted-foreground mt-1">{org.description || 'No description'}</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <div className="mt-2">
+            <OrgTagSelector
+              organizationId={org.id}
+              tags={org.tags || []}
+              canEdit={isAdmin}
+              onChange={(nextTags) => setOrg((prev) => ({ ...prev, tags: nextTags }))}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
             Created {formatDate(org.created_at || org.createdAt)}
           </p>
         </div>
