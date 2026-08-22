@@ -12,61 +12,21 @@ import {
   Loader2,
   Eye,
   Info,
-  Building2,
-  User,
-  Mail,
-  LineChart,
-  Globe,
+  Tag,
 } from "lucide-react";
+import {
+  GLOBAL_OPTION,
+  SELECTABLE_GROUP_OPTIONS,
+  getGroupMeta,
+} from "../constants/instructionGroups";
+import { TypeBadge } from "./OrgInstructionTypes";
 
-// Global scope — the instruction is applied to every group in the organization.
-const GLOBAL_OPTION = {
-  value: "all",
-  label: "All groups",
-  description: "Applied globally to every group in this organization",
-  icon: Globe,
-};
-
-const GROUP_OPTIONS = [
-  {
-    value: "company",
-    label: "Companies",
-    description: "Applied when analyzing companies",
-    icon: Building2,
-  },
-  {
-    value: "person",
-    label: "People",
-    description: "Applied when analyzing people",
-    icon: User,
-  },
-  {
-    value: "email",
-    label: "Emails",
-    description: "Applied when generating emails",
-    icon: Mail,
-  },
-  {
-    value: "analysis",
-    label: "Analyses",
-    description: "Applied when generating analyses",
-    icon: LineChart,
-    hidden: true,
-  },
-];
-
-// Groups the user can actually pick when creating/editing an instruction.
-const SELECTABLE_GROUP_OPTIONS = GROUP_OPTIONS.filter((g) => !g.hidden);
-
-function getGroupMeta(groupType) {
-  if (groupType === "all") return GLOBAL_OPTION;
-  return (
-    GROUP_OPTIONS.find((g) => g.value === groupType) || {
-      value: groupType,
-      label: groupType || "Unknown",
-      icon: FileText,
-    }
-  );
+// Reads the type ids an instruction is currently attached to, tolerating the
+// several shapes the API may return (array of objects or array of ids).
+function readTypeIds(instruction) {
+  const types = instruction?.types;
+  if (!Array.isArray(types)) return [];
+  return types.map((t) => (typeof t === "string" ? t : t.id)).filter(Boolean);
 }
 
 function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
@@ -80,7 +40,57 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
+  const [types, setTypes] = useState([]);
+  const [typesLoading, setTypesLoading] = useState(false);
+  const [selectedTypeIds, setSelectedTypeIds] = useState(
+    readTypeIds(instruction),
+  );
+
   const isEdit = !!instruction;
+
+  // Types belong to a specific group. Global instructions ("all") have no
+  // types, so we only load/show the checkboxes for a concrete group.
+  useEffect(() => {
+    if (groupType === "all") {
+      setTypes([]);
+      return;
+    }
+    let cancelled = false;
+    const loadTypes = async () => {
+      setTypesLoading(true);
+      try {
+        const res = await api.get(
+          `/instruction-types?organizationId=${organizationId}&group=${groupType}`,
+        );
+        if (!res.ok) throw new Error("Failed to load types");
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : data.types || [];
+        if (!cancelled) setTypes(list);
+      } catch {
+        if (!cancelled) setTypes([]);
+      } finally {
+        if (!cancelled) setTypesLoading(false);
+      }
+    };
+    loadTypes();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupType, organizationId]);
+
+  const toggleType = (id) => {
+    setSelectedTypeIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
+    );
+  };
+
+  // Types are scoped to a group, so switching groups invalidates the current
+  // selection.
+  const changeGroup = (value) => {
+    if (value === groupType) return;
+    setGroupType(value);
+    setSelectedTypeIds([]);
+  };
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -96,9 +106,11 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
     setLoading(true);
     setError(null);
     try {
-      const payload = isEdit
-        ? { input: { title: title.trim(), content, groupType } }
-        : { organizationId, input: { title: title.trim(), content, groupType } };
+      // Global instructions have no types; otherwise send the checkbox
+      // selection (an empty array clears all type links, making it general).
+      const typeIds = groupType === "all" ? [] : selectedTypeIds;
+      const input = { title: title.trim(), content, groupType, typeIds };
+      const payload = isEdit ? { input } : { organizationId, input };
 
       const response = isEdit
         ? await api.put(`/instructions/${instruction.id}`, payload)
@@ -148,7 +160,7 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
               return (
                 <button
                   type="button"
-                  onClick={() => setGroupType(GLOBAL_OPTION.value)}
+                  onClick={() => changeGroup(GLOBAL_OPTION.value)}
                   className={`w-full flex items-start gap-2 p-3 rounded-lg border text-left transition-colors mb-2 ${
                     active
                       ? "border-primary bg-primary/5"
@@ -179,7 +191,7 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setGroupType(opt.value)}
+                    onClick={() => changeGroup(opt.value)}
                     className={`flex items-start gap-2 p-3 rounded-lg border text-left transition-colors ${
                       active
                         ? "border-primary bg-primary/5"
@@ -213,6 +225,55 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
                 : "The instruction applies to all entities of the selected group in this organization."}
             </p>
           </div>
+
+          {groupType !== "all" && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Types
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Attach this instruction to one or more types. Leave all
+                unchecked to make it a general instruction for the whole group.
+              </p>
+              {typesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading types...
+                </div>
+              ) : types.length === 0 ? (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                  <Tag className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground">
+                    No types for this group yet. Create types in the
+                    &quot;Instruction Types&quot; tab to categorize instructions.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {types.map((t) => {
+                    const checked = selectedTypeIds.includes(t.id);
+                    return (
+                      <label
+                        key={t.id}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                          checked
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-secondary"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleType(t.id)}
+                          className="w-4 h-4 rounded border-input accent-primary shrink-0"
+                        />
+                        <TypeBadge type={t} />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
