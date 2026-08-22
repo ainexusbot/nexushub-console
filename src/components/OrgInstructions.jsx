@@ -13,6 +13,7 @@ import {
   Eye,
   Info,
   Tag,
+  Filter,
 } from "lucide-react";
 import {
   GLOBAL_OPTION,
@@ -450,18 +451,71 @@ export default function OrgInstructions({ organizationId }) {
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  // List filters. "__all__" means "whole library" (no group param); "all" is
+  // the global scope. typeMode is one of "all" | "untyped" | "type".
+  const [filterGroup, setFilterGroup] = useState("__all__");
+  const [includeGlobal, setIncludeGlobal] = useState(false);
+  const [typeMode, setTypeMode] = useState("all");
+  const [filterTypeId, setFilterTypeId] = useState("");
+  const [filterTypes, setFilterTypes] = useState([]);
+
+  // A concrete group (not the whole library and not the global scope) is the
+  // only case where per-type filtering and the global toggle make sense.
+  const isConcreteGroup =
+    filterGroup !== "__all__" && filterGroup !== "all";
+
   useEffect(() => {
     fetchInstructions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
+  }, [organizationId, filterGroup, includeGlobal, typeMode, filterTypeId]);
+
+  // Types are scoped to a group, so (re)load the list whenever a concrete
+  // group is selected, and reset any type-specific filter otherwise.
+  useEffect(() => {
+    if (!isConcreteGroup) {
+      setFilterTypes([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(
+          `/instruction-types?organizationId=${organizationId}&group=${filterGroup}`,
+        );
+        if (!res.ok) throw new Error("Failed to load types");
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : data.types || [];
+        if (!cancelled) setFilterTypes(list);
+      } catch {
+        if (!cancelled) setFilterTypes([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, filterGroup]);
+
+  // Switching groups invalidates any group-scoped filters.
+  const changeFilterGroup = (value) => {
+    setFilterGroup(value);
+    setTypeMode("all");
+    setFilterTypeId("");
+    if (value === "__all__" || value === "all") setIncludeGlobal(false);
+  };
 
   const fetchInstructions = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(
-        `/instructions?organizationId=${organizationId}`,
-      );
+      const params = new URLSearchParams({ organizationId });
+      if (filterGroup !== "__all__") params.set("group", filterGroup);
+      if (includeGlobal && isConcreteGroup) params.set("includeGlobal", "true");
+      if (typeMode === "untyped") params.set("untyped", "true");
+      else if (typeMode === "type" && filterTypeId)
+        params.set("typeId", filterTypeId);
+
+      const response = await api.get(`/instructions?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch instructions");
       const data = await response.json();
       const list = Array.isArray(data)
@@ -532,6 +586,70 @@ export default function OrgInstructions({ organizationId }) {
             <Plus className="w-4 h-4" />
             New Instruction
           </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-border bg-card">
+        <div className="flex items-center gap-1.5">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">Filters</span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs text-muted-foreground">Scope</label>
+          <select
+            value={filterGroup}
+            onChange={(e) => changeFilterGroup(e.target.value)}
+            className="px-2 py-1.5 rounded-lg border border-input bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="__all__">All library</option>
+            <option value="all">Global only</option>
+            {SELECTABLE_GROUP_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {isConcreteGroup && (
+          <>
+            <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeGlobal}
+                onChange={(e) => setIncludeGlobal(e.target.checked)}
+                className="w-4 h-4 rounded border-input accent-primary"
+              />
+              Include global
+            </label>
+
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-muted-foreground">Types</label>
+              <select
+                value={typeMode === "type" ? filterTypeId : typeMode}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "all" || v === "untyped") {
+                    setTypeMode(v);
+                    setFilterTypeId("");
+                  } else {
+                    setTypeMode("type");
+                    setFilterTypeId(v);
+                  }
+                }}
+                className="px-2 py-1.5 rounded-lg border border-input bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="all">All types</option>
+                <option value="untyped">General (no type)</option>
+                {filterTypes.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
       </div>
 
@@ -608,6 +726,31 @@ export default function OrgInstructions({ organizationId }) {
                   <p className="text-sm text-muted-foreground line-clamp-1">
                     {(item.content || "").slice(0, 120) || "Empty document"}
                   </p>
+                  {(() => {
+                    const itemTypes = Array.isArray(item.types)
+                      ? item.types
+                      : [];
+                    const isGlobal =
+                      (item.group_type || item.groupType) === "all";
+                    if (isGlobal) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {itemTypes.length === 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-muted-foreground">
+                            <Tag className="w-3 h-3" />
+                            General
+                          </span>
+                        ) : (
+                          itemTypes.map((t) => (
+                            <TypeBadge
+                              key={typeof t === "string" ? t : t.id}
+                              type={typeof t === "string" ? { name: t } : t}
+                            />
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
                   <p className="text-xs text-muted-foreground">
                     Updated{" "}
                     {formatDate(
