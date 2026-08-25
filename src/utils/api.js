@@ -87,6 +87,17 @@ export function getApiBase() {
   return API_BASE;
 }
 
+// Pull the server's own message off a failed response so the UI can show it
+// instead of a generic "request failed" string.
+export async function readError(response, fallback = "Request failed") {
+  try {
+    const data = await response.json();
+    return data.error || data.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function formatDate(dateString) {
   if (!dateString) return "-";
   return new Date(dateString).toLocaleDateString("ru-RU", {

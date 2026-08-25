@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, formatDate } from '../utils/api'
+import { api, formatDate, readError } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
 import {
   Plus,
@@ -22,6 +22,7 @@ import {
   Trash2,
   Building2,
   RotateCcw,
+  ShieldAlert,
 } from 'lucide-react'
 import UserTagSelector from '../components/UserTagSelector'
 
@@ -529,11 +530,12 @@ function DeleteUserModal({ user, onClose, onDeleted }) {
 const PAGE_SIZE = 25
 
 export default function UsersPage() {
-  const { user: currentUser, isAdmin } = useAuth()
+  const { user: currentUser, isAdmin, syncUser, logout } = useAuth()
   const [users, setUsers] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [forbidden, setForbidden] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editUser, setEditUser] = useState(null)
   const [deleteUser, setDeleteUser] = useState(null)
@@ -582,6 +584,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     setLoading(true)
     setError(null)
+    setForbidden(false)
     try {
       const params = new URLSearchParams()
       if (debouncedSearch) params.set('search', debouncedSearch)
@@ -597,15 +600,25 @@ export default function UsersPage() {
       params.set('offset', String(page * PAGE_SIZE))
 
       const response = await api.get(`/users?${params.toString()}`)
-      if (!response.ok) throw new Error('Failed to fetch users')
+
+      if (response.status === 403) {
+        // The server rejected the token's role. Re-sync the session so a stale
+        // cached role in localStorage can't keep showing admin-only UI.
+        setForbidden(true)
+        setUsers([])
+        setTotal(0)
+        setError(await readError(response, 'Admin access required.'))
+        await syncUser()
+        return
+      }
+
+      if (!response.ok) throw new Error(await readError(response, 'Failed to fetch users'))
       const data = await response.json()
-      console.log('[v0] users response:', data)
 
       // Backend returns { users, total }; keep fallbacks for older/nested shapes
       const list = Array.isArray(data)
         ? data
         : data.users || data.results || data.data?.users || data.data || []
-      console.log('[v0] parsed users list length:', Array.isArray(list) ? list.length : 'not-array')
       setUsers(Array.isArray(list) ? list : [])
       setTotal(
         typeof data.total === 'number'
@@ -666,6 +679,44 @@ export default function UsersPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1
   const rangeEnd = Math.min(total, page * PAGE_SIZE + users.length)
+
+  if (forbidden) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Users</h1>
+          <p className="text-muted-foreground mt-1">Admins and project users across the platform</p>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-8 flex flex-col items-center text-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+            <ShieldAlert className="w-6 h-6 text-destructive" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Admin access required</h2>
+          <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+            {error || 'Admin access required.'} The account you are signed in as (
+            <span className="text-foreground font-medium">{currentUser?.email || 'unknown'}</span>,
+            role <span className="text-foreground font-medium">{currentUser?.role || 'unknown'}</span>
+            ) does not have permission to list users. Sign in with an admin account or ask a
+            super admin to grant your account the admin role.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={fetchUsers}
+              className="px-4 py-2 rounded-lg border border-border text-sm text-foreground hover:bg-secondary transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={logout}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
+            >
+              Sign in as another user
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
