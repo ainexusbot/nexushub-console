@@ -54,6 +54,30 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Re-fetch the session from the server and overwrite the cached user.
+  // The cached copy in localStorage can be stale (e.g. the role changed on the
+  // server), which makes the UI think it has admin rights when it does not.
+  const syncUser = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => ({}))
+      if (data.accessToken) setToken(data.accessToken)
+      if (data.user) {
+        setUser(data.user)
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user))
+        return data.user
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
   const login = async (email, password) => {
     setError(null)
     try {
@@ -97,7 +121,9 @@ export function AuthProvider({ children }) {
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin' || user?.is_admin
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, checkAuth, isAdmin }}>
+    <AuthContext.Provider
+      value={{ user, loading, error, login, logout, checkAuth, syncUser, isAdmin }}
+    >
       {children}
     </AuthContext.Provider>
   )
