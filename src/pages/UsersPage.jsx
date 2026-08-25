@@ -21,7 +21,25 @@ import {
   Pencil,
   Trash2,
   Building2,
+  RotateCcw,
 } from 'lucide-react'
+import UserTagSelector from '../components/UserTagSelector'
+
+const SORT_OPTIONS = [
+  { value: 'createdAt:desc', label: 'Newest first' },
+  { value: 'createdAt:asc', label: 'Oldest first' },
+  { value: 'updatedAt:desc', label: 'Recently updated' },
+  { value: 'name:asc', label: 'Name A–Z' },
+  { value: 'name:desc', label: 'Name Z–A' },
+  { value: 'email:asc', label: 'Email A–Z' },
+  { value: 'email:desc', label: 'Email Z–A' },
+  { value: 'role:asc', label: 'Role A–Z' },
+]
+
+// Read the tags array off a user regardless of the API field name.
+function userTags(u) {
+  return u.tags || u.tagList || u.tag_list || []
+}
 
 const ROLE_META = {
   super_admin: { label: 'Super Admin', icon: ShieldCheck, className: 'bg-primary/10 text-primary' },
@@ -522,6 +540,10 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [selectedTagIds, setSelectedTagIds] = useState([])
+  const [tagMatch, setTagMatch] = useState('any')
+  const [sortValue, setSortValue] = useState('createdAt:desc')
+  const [allTags, setAllTags] = useState([])
   const [page, setPage] = useState(0)
 
   // Debounce the search input so we don't hit the API on every keystroke
@@ -533,12 +555,29 @@ export default function UsersPage() {
   // Reset to the first page whenever the filters change
   useEffect(() => {
     setPage(0)
-  }, [debouncedSearch, roleFilter])
+  }, [debouncedSearch, roleFilter, selectedTagIds, tagMatch, sortValue])
 
   useEffect(() => {
     fetchUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, roleFilter, page])
+  }, [debouncedSearch, roleFilter, selectedTagIds, tagMatch, sortValue, page])
+
+  useEffect(() => {
+    fetchTags()
+  }, [])
+
+  // Users share the global tag dictionary with organizations.
+  const fetchTags = async () => {
+    try {
+      let response = await api.get('/organization-tags')
+      if (!response.ok) response = await api.get('/tags')
+      if (!response.ok) return
+      const data = await response.json()
+      setAllTags(Array.isArray(data) ? data : data.tags || [])
+    } catch {
+      // Tag filters are optional; a failure here should not break the list.
+    }
+  }
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -547,6 +586,13 @@ export default function UsersPage() {
       const params = new URLSearchParams()
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (roleFilter) params.set('role', roleFilter)
+      if (selectedTagIds.length > 0) {
+        params.set('tagIds', selectedTagIds.join(','))
+        params.set('tagMatch', tagMatch)
+      }
+      const [sort, order] = sortValue.split(':')
+      params.set('sort', sort)
+      params.set('order', order)
       params.set('limit', String(PAGE_SIZE))
       params.set('offset', String(page * PAGE_SIZE))
 
@@ -582,6 +628,31 @@ export default function UsersPage() {
     return name || '—'
   }
 
+  const toggleTagFilter = (tagId) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId],
+    )
+  }
+
+  const resetFilters = () => {
+    setSearch('')
+    setDebouncedSearch('')
+    setRoleFilter('')
+    setSelectedTagIds([])
+    setTagMatch('any')
+    setSortValue('createdAt:desc')
+    setPage(0)
+  }
+
+  // Optimistically patch a single user's tags after inline editing.
+  const applyTagChange = (userId, nextTags) => {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, tags: nextTags } : u)))
+    fetchTags()
+  }
+
+  const hasFilters =
+    !!debouncedSearch || !!roleFilter || selectedTagIds.length > 0 || sortValue !== 'createdAt:desc'
+
   const isSuperAdmin = currentUser?.role === 'super_admin'
 
   // Editing admin accounts (super_admin/admin) is restricted to super_admins.
@@ -615,7 +686,8 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="bg-card rounded-xl border border-border p-4 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -625,6 +697,28 @@ export default function UsersPage() {
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="Search by email or name..."
           />
+        </div>
+        <select
+          value={sortValue}
+          onChange={(e) => setSortValue(e.target.value)}
+          className="px-3 py-2 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset
+          </button>
+        )}
         </div>
         <div className="flex gap-2 flex-wrap">
           {[
@@ -648,6 +742,56 @@ export default function UsersPage() {
             </button>
           ))}
         </div>
+
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-border">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Tags
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {allTags.map((tag) => {
+                const active = selectedTagIds.includes(tag.id)
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTagFilter(tag.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    }`}
+                  >
+                    <span
+                      className="inline-block w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: tag.color || '#64748b' }}
+                    />
+                    {tag.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedTagIds.length > 1 && (
+              <div className="inline-flex rounded-lg border border-border overflow-hidden">
+                {['any', 'all'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setTagMatch(mode)}
+                    className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                      tagMatch === mode
+                        ? 'bg-secondary text-foreground'
+                        : 'text-muted-foreground hover:bg-secondary/60'
+                    }`}
+                  >
+                    Match {mode}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -665,7 +809,7 @@ export default function UsersPage() {
           <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground mb-2">No Users Found</h3>
           <p className="text-muted-foreground">
-            {debouncedSearch || roleFilter
+            {hasFilters
               ? 'Try adjusting your filters'
               : 'Add a user to get started'}
           </p>
@@ -679,6 +823,7 @@ export default function UsersPage() {
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">User</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Organization</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Role</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Tags</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Created</th>
                   {isAdmin && (
@@ -714,6 +859,14 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3">
                         <RoleBadge role={u.role} />
+                      </td>
+                      <td className="px-4 py-3 max-w-[240px]">
+                        <UserTagSelector
+                          userId={u.id}
+                          tags={userTags(u)}
+                          canEdit={isAdmin}
+                          onChange={(nextTags) => applyTagChange(u.id, nextTags)}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <VerifiedBadge verified={verified} />
