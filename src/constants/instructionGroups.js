@@ -1,4 +1,12 @@
-import { Building2, User, Mail, LineChart, Globe, FileText } from "lucide-react";
+import {
+  Building2,
+  Boxes,
+  User,
+  Mail,
+  LineChart,
+  Globe,
+  FileText,
+} from "lucide-react";
 
 // Global scope — the instruction is applied to every group in the organization.
 export const GLOBAL_OPTION = {
@@ -14,6 +22,12 @@ export const GROUP_OPTIONS = [
     label: "Companies",
     description: "Applied when analyzing companies",
     icon: Building2,
+  },
+  {
+    value: "company_bulk",
+    label: "Companies (Bulk)",
+    description: "Applied when analyzing bulk-uploaded companies",
+    icon: Boxes,
   },
   {
     value: "person",
