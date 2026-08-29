@@ -5,6 +5,7 @@ import {
   Building2,
   Users,
   Tag,
+  Cpu,
   LogOut,
   Menu,
   X,
@@ -16,6 +17,7 @@ const navigation = [
   { name: 'Organizations', href: '/organizations', icon: Building2 },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Tags', href: '/tags', icon: Tag },
+  { name: 'AI Models', href: '/ai-models', icon: Cpu },
 ]
 
 const ROLE_LABELS = {
