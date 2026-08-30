@@ -8,6 +8,7 @@ import {
   X,
   AlertCircle,
   Cpu,
+  KeyRound,
   Loader2,
   CheckCircle2,
   Zap,
@@ -434,6 +435,16 @@ export default function AiModelsPage() {
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
                         {providerLabel(m.provider)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {m.keyLabel ? (
+                        <span className="inline-flex items-center gap-1 text-sm text-foreground">
+                          <KeyRound className="w-3.5 h-3.5 text-muted-foreground" />
+                          {m.keyLabel}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Auto</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {m.isActive ? (
