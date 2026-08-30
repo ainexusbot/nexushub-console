@@ -36,7 +36,13 @@ export default function OrganizationDetailPage() {
       const response = await api.get(`/organizations/${id}`)
       if (!response.ok) throw new Error('Failed to load organization')
       const data = await response.json()
-      setOrg(data)
+      // The single-organization endpoint may wrap the payload (e.g.
+      // { organization: {...} } or { data: {...} }) instead of returning the
+      // org object at the top level. Unwrap it so name/description/tags resolve.
+      const raw = data.organization || data.org || data.data || data
+      // Normalize the tags field regardless of the API's naming.
+      const tags = raw.tags || raw.tagList || raw.tag_list || []
+      setOrg({ ...raw, tags })
     } catch (err) {
       setError(err.message)
     } finally {
