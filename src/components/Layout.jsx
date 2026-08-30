@@ -6,6 +6,7 @@ import {
   Users,
   Tag,
   Cpu,
+  KeyRound,
   LogOut,
   Menu,
   X,
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Tags', href: '/tags', icon: Tag },
   { name: 'AI Models', href: '/ai-models', icon: Cpu },
+  { name: 'API Keys', href: '/ai-provider-keys', icon: KeyRound },
 ]
 
 const ROLE_LABELS = {

@@ -8,6 +8,7 @@ import OrganizationDetailPage from './pages/OrganizationDetailPage'
 import UsersPage from './pages/UsersPage'
 import TagsPage from './pages/TagsPage'
 import AiModelsPage from './pages/AiModelsPage'
+import AiProviderKeysPage from './pages/AiProviderKeysPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/tags" element={<TagsPage />} />
                 <Route path="/ai-models" element={<AiModelsPage />} />
+                <Route path="/ai-provider-keys" element={<AiProviderKeysPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>
