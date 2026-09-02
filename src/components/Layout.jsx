@@ -7,6 +7,7 @@ import {
   Tag,
   Cpu,
   KeyRound,
+  Database,
   LogOut,
   Menu,
   X,
@@ -16,6 +17,7 @@ import { useState } from 'react'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, end: true },
   { name: 'Organizations', href: '/organizations', icon: Building2 },
+  { name: 'Client Data', href: '/client-data', icon: Database, adminOnly: true },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Tags', href: '/tags', icon: Tag },
   { name: 'AI Models', href: '/ai-models', icon: Cpu },
@@ -30,7 +32,7 @@ const ROLE_LABELS = {
 }
 
 export default function Layout({ children }) {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -75,7 +77,7 @@ export default function Layout({ children }) {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
-            {navigation.map((item) => (
+            {navigation.filter((item) => !item.adminOnly || isAdmin).map((item) => (
               <NavLink
                 key={item.name}
                 to={item.href}

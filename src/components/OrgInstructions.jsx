@@ -48,11 +48,13 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
   );
 
   const isEdit = !!instruction;
+  const groupSupportsTypes =
+    groupType !== "all" && getGroupMeta(groupType).supportsTypes !== false;
 
   // Types belong to a specific group. Global instructions ("all") have no
   // types, so we only load/show the checkboxes for a concrete group.
   useEffect(() => {
-    if (groupType === "all") {
+    if (!groupSupportsTypes) {
       setTypes([]);
       return;
     }
@@ -77,7 +79,7 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
     return () => {
       cancelled = true;
     };
-  }, [groupType, organizationId]);
+  }, [groupType, groupSupportsTypes, organizationId]);
 
   const toggleType = (id) => {
     setSelectedTypeIds((prev) =>
@@ -109,7 +111,7 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
     try {
       // Global instructions have no types; otherwise send the checkbox
       // selection (an empty array clears all type links, making it general).
-      const typeIds = groupType === "all" ? [] : selectedTypeIds;
+      const typeIds = groupSupportsTypes ? selectedTypeIds : [];
       const input = { title: title.trim(), content, groupType, typeIds };
       const payload = isEdit ? { input } : { organizationId, input };
 
@@ -223,11 +225,13 @@ function InstructionEditor({ organizationId, instruction, onClose, onSave }) {
             <p className="mt-2 text-xs text-muted-foreground">
               {groupType === "all"
                 ? "This instruction is global — it applies to every group in this organization."
+                : groupType === "company_fast"
+                  ? "Fast company analysis runs after the global instruction. Other company and analysis instructions are not included."
                 : "The instruction applies to all entities of the selected group in this organization."}
             </p>
           </div>
 
-          {groupType !== "all" && (
+          {groupSupportsTypes && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">
                 Types
@@ -463,6 +467,8 @@ export default function OrgInstructions({ organizationId }) {
   // only case where per-type filtering and the global toggle make sense.
   const isConcreteGroup =
     filterGroup !== "__all__" && filterGroup !== "all";
+  const supportsTypeFilter =
+    isConcreteGroup && getGroupMeta(filterGroup).supportsTypes !== false;
 
   useEffect(() => {
     fetchInstructions();
@@ -472,7 +478,7 @@ export default function OrgInstructions({ organizationId }) {
   // Types are scoped to a group, so (re)load the list whenever a concrete
   // group is selected, and reset any type-specific filter otherwise.
   useEffect(() => {
-    if (!isConcreteGroup) {
+    if (!supportsTypeFilter) {
       setFilterTypes([]);
       return;
     }
@@ -494,7 +500,7 @@ export default function OrgInstructions({ organizationId }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, filterGroup]);
+  }, [organizationId, filterGroup, supportsTypeFilter]);
 
   // Switching groups invalidates any group-scoped filters.
   const changeFilterGroup = (value) => {
@@ -624,31 +630,33 @@ export default function OrgInstructions({ organizationId }) {
               Include global
             </label>
 
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs text-muted-foreground">Types</label>
-              <select
-                value={typeMode === "type" ? filterTypeId : typeMode}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "all" || v === "untyped") {
-                    setTypeMode(v);
-                    setFilterTypeId("");
-                  } else {
-                    setTypeMode("type");
-                    setFilterTypeId(v);
-                  }
-                }}
-                className="px-2 py-1.5 rounded-lg border border-input bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="all">All types</option>
-                <option value="untyped">General (no type)</option>
-                {filterTypes.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {supportsTypeFilter && (
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-muted-foreground">Types</label>
+                <select
+                  value={typeMode === "type" ? filterTypeId : typeMode}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "all" || v === "untyped") {
+                      setTypeMode(v);
+                      setFilterTypeId("");
+                    } else {
+                      setTypeMode("type");
+                      setFilterTypeId(v);
+                    }
+                  }}
+                  className="px-2 py-1.5 rounded-lg border border-input bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All types</option>
+                  <option value="untyped">General (no type)</option>
+                  {filterTypes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -732,7 +740,10 @@ export default function OrgInstructions({ organizationId }) {
                       : [];
                     const isGlobal =
                       (item.group_type || item.groupType) === "all";
-                    if (isGlobal) return null;
+                    const supportsTypes = getGroupMeta(
+                      item.group_type || item.groupType,
+                    ).supportsTypes !== false;
+                    if (isGlobal || !supportsTypes) return null;
                     return (
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {itemTypes.length === 0 ? (

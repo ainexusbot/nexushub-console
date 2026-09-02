@@ -1,6 +1,7 @@
 import {
   Building2,
   Boxes,
+  Zap,
   User,
   Mail,
   LineChart,
@@ -14,6 +15,7 @@ export const GLOBAL_OPTION = {
   label: "All groups",
   description: "Applied globally to every group in this organization",
   icon: Globe,
+  supportsTypes: false,
 };
 
 export const GROUP_OPTIONS = [
@@ -28,6 +30,13 @@ export const GROUP_OPTIONS = [
     label: "Companies (Bulk)",
     description: "Applied when analyzing bulk-uploaded companies",
     icon: Boxes,
+  },
+  {
+    value: "company_fast",
+    label: "Companies (Fast)",
+    description: "Quick company analysis after the global rules",
+    icon: Zap,
+    supportsTypes: false,
   },
   {
     value: "person",

@@ -18,6 +18,10 @@ import {
   DEFAULT_TYPE_COLOR,
 } from "../constants/instructionGroups";
 
+const TYPE_GROUP_OPTIONS = SELECTABLE_GROUP_OPTIONS.filter(
+  (option) => option.supportsTypes !== false,
+);
+
 function slugify(value) {
   return value
     .toString()
@@ -140,7 +144,7 @@ function TypeEditor({ organizationId, type, onClose, onSave }) {
               Group *
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {SELECTABLE_GROUP_OPTIONS.map((opt) => {
+              {TYPE_GROUP_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const active = groupType === opt.value;
                 return (

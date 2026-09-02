@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, formatDate } from '../utils/api'
-import { ArrowLeft, Building2, Users, FileText, Tag, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Building2, Users, FileText, Tag, LayoutGrid, Database } from 'lucide-react'
 import OrgMembers from '../components/OrgMembers'
 import OrgInstructions from '../components/OrgInstructions'
 import OrgInstructionTypes from '../components/OrgInstructionTypes'
@@ -83,25 +83,35 @@ export default function OrganizationDetailPage() {
         <ArrowLeft className="w-4 h-4" /> Back to organizations
       </Link>
 
-      <div className="flex items-start gap-4">
-        <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Building2 className="w-7 h-7 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{org.name}</h1>
-          <p className="text-muted-foreground mt-1">{org.description || 'No description'}</p>
-          <div className="mt-2">
-            <OrgTagSelector
-              organizationId={org.id}
-              tags={org.tags || []}
-              canEdit={isAdmin}
-              onChange={(nextTags) => setOrg((prev) => ({ ...prev, tags: nextTags }))}
-            />
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Building2 className="w-7 h-7 text-primary" />
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Created {formatDate(org.created_at || org.createdAt)}
-          </p>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{org.name}</h1>
+            <p className="text-muted-foreground mt-1">{org.description || 'No description'}</p>
+            <div className="mt-2">
+              <OrgTagSelector
+                organizationId={org.id}
+                tags={org.tags || []}
+                canEdit={isAdmin}
+                onChange={(nextTags) => setOrg((prev) => ({ ...prev, tags: nextTags }))}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Created {formatDate(org.created_at || org.createdAt)}
+            </p>
+          </div>
         </div>
+        {isAdmin && (
+          <Link
+            to={`/client-data/${org.id}`}
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors shrink-0"
+          >
+            <Database className="w-4 h-4" /> View Client Data
+          </Link>
+        )}
       </div>
 
       {/* Tabs */}
