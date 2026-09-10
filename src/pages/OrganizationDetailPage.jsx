@@ -105,12 +105,15 @@ export default function OrganizationDetailPage() {
           </div>
         </div>
         {isAdmin && (
+          <div className="flex flex-wrap gap-2">
+          <Link to={`/subscriptions/${org.id}`} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Subscription & usage</Link>
           <Link
             to={`/client-data/${org.id}`}
             className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors shrink-0"
           >
             <Database className="w-4 h-4" /> View Client Data
           </Link>
+          </div>
         )}
       </div>
 

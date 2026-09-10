@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview --host 0.0.0.0 --port $PORT",
-    "preview": "vite preview --host 0.0.0.0 --port $PORT"
+    "preview": "vite preview --host 0.0.0.0 --port $PORT",
+    "test:subscriptions": "node tests/run-subscriptions.mjs"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -18,9 +19,12 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.6",
     "@tailwindcss/vite": "^4.3.0",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",
+    "esbuild": "^0.25.12",
+    "jsdom": "^26.1.0",
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.6",
     "vite": "^6.3.5"

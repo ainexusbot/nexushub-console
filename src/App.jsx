@@ -1,3 +1,5 @@
+import SubscriptionsPage from './pages/subscriptions/SubscriptionsPage'
+import SubscriptionDetailPage from './pages/subscriptions/SubscriptionDetailPage'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
@@ -45,6 +47,8 @@ export default function App() {
                 <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
                 <Route path="/client-data" element={<ClientDataPage />} />
                 <Route path="/client-data/:id" element={<ClientOrganizationDataPage />} />
+                <Route path="/subscriptions" element={<SubscriptionsPage />} />
+                <Route path="/subscriptions/:id" element={<SubscriptionDetailPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/tags" element={<TagsPage />} />
                 <Route path="/ai-models" element={<AiModelsPage />} />
