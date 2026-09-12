@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { api, formatDate, readError } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
+import { useAiProviders } from '../hooks/useAiProviders'
+import { defaultProviderId, providerLabel, providerOption } from '../constants/aiProviders'
 import {
   Plus,
   Edit2,
@@ -13,19 +15,11 @@ import {
   Zap,
 } from 'lucide-react'
 
-const PROVIDERS = [
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'anthropic', label: 'Anthropic' },
-]
-
-function providerLabel(value) {
-  return PROVIDERS.find((p) => p.value === value)?.label || value
-}
-
-function KeyModal({ apiKey, onClose, onSave }) {
+function KeyModal({ apiKey, providers, onClose, onSave }) {
   const isEdit = Boolean(apiKey)
+  const initialProvider = apiKey?.provider || defaultProviderId(providers)
   const [formData, setFormData] = useState({
-    provider: apiKey?.provider || 'openai',
+    provider: initialProvider,
     label: apiKey?.label || '',
     apiKey: '',
   })
@@ -33,6 +27,8 @@ function KeyModal({ apiKey, onClose, onSave }) {
   const [activateNow, setActivateNow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const selectedProvider = providerOption(providers, formData.provider)
+  const providerChanged = isEdit && formData.provider !== apiKey.provider
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -45,6 +41,9 @@ function KeyModal({ apiKey, onClose, onSave }) {
         label: formData.label.trim(),
       }
       const secret = formData.apiKey.trim()
+      if (providerChanged && !secret) {
+        throw new Error('Enter a new API key when changing the provider.')
+      }
       // On edit the secret is optional — omit it to keep the existing key.
       if (secret || !isEdit) input.apiKey = secret
 
@@ -86,14 +85,15 @@ function KeyModal({ apiKey, onClose, onSave }) {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Provider *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {PROVIDERS.map((p) => (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="group" aria-label="Provider">
+              {providers.map((p) => (
                 <button
-                  key={p.value}
+                  key={p.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, provider: p.value })}
+                  aria-pressed={formData.provider === p.id}
+                  onClick={() => setFormData({ ...formData, provider: p.id })}
                   className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                    formData.provider === p.value
+                    formData.provider === p.id
                       ? 'border-primary bg-primary/10 text-foreground'
                       : 'border-border text-muted-foreground hover:bg-secondary'
                   }`}
@@ -102,37 +102,45 @@ function KeyModal({ apiKey, onClose, onSave }) {
                 </button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Environment fallback: <code className="text-foreground">{selectedProvider.apiKeyEnv}</code>{' '}
+              ({selectedProvider.envFallbackConfigured ? 'configured' : 'not configured'}).
+            </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Label *</label>
             <input
               type="text"
+              aria-label="Key label"
               value={formData.label}
               onChange={(e) => setFormData({ ...formData, label: e.target.value })}
               required
               className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Anthropic — prod"
+              placeholder={`${selectedProvider.label} — production`}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              API Key {isEdit ? '' : '*'}
+              API Key {!isEdit || providerChanged ? '*' : ''}
             </label>
             <input
               type="password"
+              aria-label="API key"
               value={formData.apiKey}
               onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-              required={!isEdit}
+              required={!isEdit || providerChanged}
               autoComplete="off"
               className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono text-sm"
-              placeholder={isEdit ? 'Leave blank to keep current key' : 'sk-...'}
+              placeholder={isEdit && !providerChanged ? 'Leave blank to keep current key' : 'Paste provider API key'}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              {isEdit
-                ? 'Leave blank to keep the current secret, or enter a new one to replace it.'
-                : 'Stored securely on the backend and never shown again.'}
+              {providerChanged
+                ? 'A new secret is required because this key now belongs to another provider.'
+                : isEdit
+                  ? 'Leave blank to keep the current secret, or enter a new one to replace it.'
+                  : 'Stored securely on the backend and never shown again.'}
             </p>
           </div>
 
@@ -175,6 +183,7 @@ function KeyModal({ apiKey, onClose, onSave }) {
 
 export default function AiProviderKeysPage() {
   const { isAdmin } = useAuth()
+  const { providers, error: providersError } = useAiProviders()
   const [keys, setKeys] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -271,6 +280,14 @@ export default function AiProviderKeysPage() {
         </div>
       )}
 
+      {providersError && (
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+          <p className="text-sm text-foreground">
+            Provider metadata could not be loaded from the backend. The built-in OpenAI, Anthropic and DeepSeek list is shown; deploy the updated backend before saving changes.
+          </p>
+        </div>
+      )}
+
       {keys.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <KeyRound className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -313,7 +330,7 @@ export default function AiProviderKeysPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                        {providerLabel(k.provider)}
+                        {providerLabel(providers, k.provider)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -384,6 +401,7 @@ export default function AiProviderKeysPage() {
       {showModal && (
         <KeyModal
           apiKey={editKey}
+          providers={providers}
           onClose={() => {
             setShowModal(false)
             setEditKey(null)

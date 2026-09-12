@@ -1,13 +1,18 @@
 {
   "name": "admin-panel",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview --host 0.0.0.0 --port $PORT",
     "preview": "vite preview --host 0.0.0.0 --port $PORT",
-    "test:subscriptions": "node tests/run-subscriptions.mjs"
+    "test:subscriptions": "node tests/run-subscriptions.mjs",
+    "test:ai-providers": "node tests/run-ai-providers.mjs"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -29,5 +34,5 @@
     "tailwindcss": "^4.1.6",
     "vite": "^6.3.5"
   },
-  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
+  "packageManager": "pnpm@11.19.0"
 }

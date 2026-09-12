@@ -25,3 +25,4 @@ dist-ssr
 
 # Temporary bundled component test
 tests/.subscriptions.test.mjs
+tests/.ai-providers.test.mjs

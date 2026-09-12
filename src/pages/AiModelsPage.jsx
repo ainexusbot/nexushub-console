@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
 import { api, formatDate, readError } from '../utils/api'
 import { useAuth } from '../context/AuthContext'
+import { useAiProviders } from '../hooks/useAiProviders'
+import {
+  defaultProviderId,
+  modelSuggestions,
+  providerLabel,
+  providerOption,
+} from '../constants/aiProviders'
 import {
   Plus,
   Edit2,
@@ -14,32 +21,12 @@ import {
   Zap,
 } from 'lucide-react'
 
-const PROVIDERS = [
-  { value: 'openai', label: 'OpenAI', keyName: 'OPENAI_API_KEY' },
-  { value: 'anthropic', label: 'Anthropic', keyName: 'ANTHROPIC_API_KEY' },
-]
-
-// A few common model ids to speed up entry — the field stays free-form so any
-// raw provider model id can be typed in.
-const MODEL_SUGGESTIONS = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3-mini'],
-  anthropic: [
-    'claude-sonnet-4-5',
-    'claude-opus-4-1',
-    'claude-3-5-sonnet-latest',
-    'claude-3-5-haiku-latest',
-  ],
-}
-
-function providerLabel(value) {
-  return PROVIDERS.find((p) => p.value === value)?.label || value
-}
-
-function ModelModal({ model, keys, onClose, onSave }) {
+function ModelModal({ model, keys, providers, onClose, onSave }) {
   const isEdit = Boolean(model)
+  const initialProvider = model?.provider || defaultProviderId(providers)
   const [formData, setFormData] = useState({
-    provider: model?.provider || 'openai',
-    model: model?.model || '',
+    provider: initialProvider,
+    model: model?.model || providerOption(providers, initialProvider).defaultModel,
     label: model?.label || '',
     description: model?.description || '',
     position: model?.position ?? 0,
@@ -81,7 +68,21 @@ function ModelModal({ model, keys, onClose, onSave }) {
     }
   }
 
-  const suggestions = MODEL_SUGGESTIONS[formData.provider] || []
+  const selectedProvider = providerOption(providers, formData.provider)
+  const suggestions = modelSuggestions(selectedProvider)
+
+  const selectProvider = (nextProvider) => {
+    setFormData((current) => {
+      const previous = providerOption(providers, current.provider)
+      const replaceModel = !current.model || current.model === previous.defaultModel
+      return {
+        ...current,
+        provider: nextProvider.id,
+        model: replaceModel ? nextProvider.defaultModel : current.model,
+        keyId: '',
+      }
+    })
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -105,14 +106,15 @@ function ModelModal({ model, keys, onClose, onSave }) {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Provider *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {PROVIDERS.map((p) => (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="group" aria-label="Provider">
+              {providers.map((p) => (
                 <button
-                  key={p.value}
+                  key={p.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, provider: p.value, keyId: '' })}
+                  aria-pressed={formData.provider === p.id}
+                  onClick={() => selectProvider(p)}
                   className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                    formData.provider === p.value
+                    formData.provider === p.id
                       ? 'border-primary bg-primary/10 text-foreground'
                       : 'border-border text-muted-foreground hover:bg-secondary'
                   }`}
@@ -122,24 +124,27 @@ function ModelModal({ model, keys, onClose, onSave }) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Requires{' '}
-              <code className="text-foreground">
-                {PROVIDERS.find((p) => p.value === formData.provider)?.keyName}
-              </code>{' '}
-              set on the backend.
+              Environment fallback: <code className="text-foreground">{selectedProvider.apiKeyEnv}</code>{' '}
+              ({selectedProvider.envFallbackConfigured ? 'configured' : 'not configured'}). Stored keys can be used instead.
             </p>
+            {selectedProvider.id === 'deepseek' && !selectedProvider.supportsServerWebTools && (
+              <p className="text-xs text-muted-foreground mt-1">
+                DeepSeek uses the supplied context; backend web search and web fetch tools are unavailable for this provider.
+              </p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Model ID *</label>
             <input
               type="text"
+              aria-label="Model ID"
               value={formData.model}
               onChange={(e) => setFormData({ ...formData, model: e.target.value })}
               required
               list="model-suggestions"
               className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring font-mono text-sm"
-              placeholder="gpt-4o-mini"
+              placeholder={selectedProvider.defaultModel || 'provider-model-id'}
             />
             <datalist id="model-suggestions">
               {suggestions.map((s) => (
@@ -155,11 +160,12 @@ function ModelModal({ model, keys, onClose, onSave }) {
             <label className="block text-sm font-medium text-foreground mb-1">Label *</label>
             <input
               type="text"
+              aria-label="Model label"
               value={formData.label}
               onChange={(e) => setFormData({ ...formData, label: e.target.value })}
               required
               className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="GPT-4o mini"
+              placeholder={`${selectedProvider.label} model`}
             />
           </div>
 
@@ -245,6 +251,7 @@ function ModelModal({ model, keys, onClose, onSave }) {
 
 export default function AiModelsPage() {
   const { isAdmin } = useAuth()
+  const { providers, error: providersError } = useAiProviders()
   const [models, setModels] = useState([])
   const [keys, setKeys] = useState([])
   const [loading, setLoading] = useState(true)
@@ -356,6 +363,14 @@ export default function AiModelsPage() {
         </div>
       )}
 
+      {providersError && (
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+          <p className="text-sm text-foreground">
+            Provider metadata could not be loaded from the backend. The built-in OpenAI, Anthropic and DeepSeek list is shown; deploy the updated backend before saving changes.
+          </p>
+        </div>
+      )}
+
       {/* Active model banner — the signature element of the page */}
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-5">
         <div className="flex items-center gap-2 mb-3">
@@ -369,7 +384,7 @@ export default function AiModelsPage() {
             <div>
               <p className="text-xl font-bold text-foreground">{activeModel.label}</p>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {providerLabel(activeModel.provider)} ·{' '}
+                {providerLabel(providers, activeModel.provider)} ·{' '}
                 <code className="text-foreground">{activeModel.model}</code>
               </p>
             </div>
@@ -433,7 +448,7 @@ export default function AiModelsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                        {providerLabel(m.provider)}
+                        {providerLabel(providers, m.provider)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -512,6 +527,7 @@ export default function AiModelsPage() {
         <ModelModal
           model={editModel}
           keys={keys}
+          providers={providers}
           onClose={() => {
             setShowModal(false)
             setEditModel(null)
