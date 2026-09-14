@@ -7,10 +7,10 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    allowedHosts: ["nexushub-console-production.up.railway.app"],
+    allowedHosts: ["admin.falcon3.ru"],
   },
 
   preview: {
-    allowedHosts: ["nexushub-console-production.up.railway.app"],
+    allowedHosts: ["admin.falcon3.ru"],
   },
 });
