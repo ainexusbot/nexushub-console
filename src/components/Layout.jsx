@@ -9,6 +9,7 @@ import {
   KeyRound,
   Database,
   Gauge,
+  LifeBuoy,
   LogOut,
   Menu,
   X,
@@ -17,6 +18,7 @@ import { useState } from 'react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, end: true },
+  { name: 'Support', href: '/support', icon: LifeBuoy, adminOnly: true },
   { name: 'Organizations', href: '/organizations', icon: Building2 },
   { name: 'Client Data', href: '/client-data', icon: Database, adminOnly: true },
   { name: 'Subscriptions', href: '/subscriptions', icon: Gauge, adminOnly: true },

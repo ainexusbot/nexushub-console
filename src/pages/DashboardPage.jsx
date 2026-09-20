@@ -7,6 +7,7 @@ import {
   Users,
   FileText,
   ArrowRight,
+  LifeBuoy,
   Plus,
 } from 'lucide-react'
 
@@ -31,9 +32,10 @@ function StatCard({ title, value, subtitle, icon: Icon, href }) {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [organizations, setOrganizations] = useState([])
   const [users, setUsers] = useState([])
+  const [supportStats, setSupportStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -59,6 +61,10 @@ export default function DashboardPage() {
       if (usersRes.ok) {
         const data = await usersRes.json()
         setUsers(Array.isArray(data) ? data : data.users || data.results || [])
+      }
+      if (isAdmin) {
+        const supportRes = await api.get('/admin/support/tickets/stats')
+        if (supportRes.ok) setSupportStats(await supportRes.json())
       }
     } catch (err) {
       setError(err.message)
@@ -95,6 +101,15 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {isAdmin && (
+          <StatCard
+            title="Support"
+            value={supportStats?.unanswered ?? '—'}
+            subtitle="Tickets waiting on a reply"
+            icon={LifeBuoy}
+            href="/support"
+          />
+        )}
         <StatCard
           title="Organizations"
           value={organizations.length}

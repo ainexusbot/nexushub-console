@@ -13,6 +13,7 @@ import AiModelsPage from './pages/AiModelsPage'
 import AiProviderKeysPage from './pages/AiProviderKeysPage'
 import ClientDataPage from './pages/ClientDataPage'
 import ClientOrganizationDataPage from './pages/ClientOrganizationDataPage'
+import SupportPage from './pages/SupportPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -47,6 +48,7 @@ export default function App() {
                 <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
                 <Route path="/client-data" element={<ClientDataPage />} />
                 <Route path="/client-data/:id" element={<ClientOrganizationDataPage />} />
+                <Route path="/support" element={<SupportPage />} />
                 <Route path="/subscriptions" element={<SubscriptionsPage />} />
                 <Route path="/subscriptions/:id" element={<SubscriptionDetailPage />} />
                 <Route path="/users" element={<UsersPage />} />
