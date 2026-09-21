@@ -23,6 +23,7 @@ import {
   Building2,
   RotateCcw,
   ShieldAlert,
+  KeyRound,
 } from 'lucide-react'
 import UserTagSelector from '../components/UserTagSelector'
 
@@ -456,6 +457,149 @@ function EditUserModal({ user, canManageAdmins, onClose, onSave }) {
   )
 }
 
+// Separate from EditUserModal on purpose — a password change is a distinct,
+// higher-stakes action and doesn't belong mixed into the regular profile form.
+function ChangePasswordModal({ user, canManageAdmins, onClose, onSave }) {
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError(null)
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await api.patch(`/users/${user.id}/password`, { password })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(
+          data.error || data.detail || data.message || 'Failed to change password',
+        )
+      }
+      onSave()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const name = [user.firstName || user.first_name, user.lastName || user.last_name]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-card rounded-xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">Change Password</h2>
+          <button onClick={onClose} className="p-1 hover:bg-secondary rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          <p className="text-sm text-muted-foreground">
+            Setting a new password for{' '}
+            <span className="text-foreground font-medium">{name || user.email}</span>. They'll be
+            signed out of every device and will need to log in again with it.
+          </p>
+
+          {!canManageAdmins && (user.role === 'admin' || user.role === 'super_admin') ? (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+              <p className="text-sm text-destructive">
+                Only a super admin can change an admin's password.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  New Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={5}
+                    autoFocus
+                    className="w-full px-3 py-2 pr-10 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="New password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-secondary rounded"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Confirm Password *
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={5}
+                  className="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Repeat the new password"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={
+                loading || (!canManageAdmins && (user.role === 'admin' || user.role === 'super_admin'))
+              }
+              className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loading ? 'Saving...' : 'Change Password'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function DeleteUserModal({ user, onClose, onDeleted }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -538,6 +682,7 @@ export default function UsersPage() {
   const [forbidden, setForbidden] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editUser, setEditUser] = useState(null)
+  const [passwordUser, setPasswordUser] = useState(null)
   const [deleteUser, setDeleteUser] = useState(null)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -941,6 +1086,15 @@ export default function UsersPage() {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => setPasswordUser(u)}
+                                  title="Change password"
+                                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                                >
+                                  <KeyRound className="w-4 h-4" />
+                                  <span className="sr-only">Change password</span>
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => setDeleteUser(u)}
                                   disabled={isSelf}
                                   title={isSelf ? 'You cannot delete yourself' : 'Delete user'}
@@ -1017,6 +1171,15 @@ export default function UsersPage() {
             setEditUser(null)
             fetchUsers()
           }}
+        />
+      )}
+
+      {passwordUser && (
+        <ChangePasswordModal
+          user={passwordUser}
+          canManageAdmins={isSuperAdmin}
+          onClose={() => setPasswordUser(null)}
+          onSave={() => setPasswordUser(null)}
         />
       )}
 

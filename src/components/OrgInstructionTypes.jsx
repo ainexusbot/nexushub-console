@@ -143,7 +143,7 @@ function TypeEditor({ organizationId, type, onClose, onSave }) {
             <label className="block text-sm font-medium text-foreground mb-2">
               Group *
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {TYPE_GROUP_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const active = groupType === opt.value;
@@ -152,18 +152,18 @@ function TypeEditor({ organizationId, type, onClose, onSave }) {
                     key={opt.value}
                     type="button"
                     onClick={() => setGroupType(opt.value)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors ${
+                    className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-left transition-colors ${
                       active
                         ? "border-primary bg-primary/5"
                         : "border-border hover:bg-secondary"
                     }`}
                   >
                     <Icon
-                      className={`w-4 h-4 shrink-0 ${
+                      className={`w-4 h-4 shrink-0 mt-0.5 ${
                         active ? "text-primary" : "text-muted-foreground"
                       }`}
                     />
-                    <span className="text-sm font-medium text-foreground truncate">
+                    <span className="text-sm font-medium text-foreground leading-snug break-words">
                       {opt.label}
                     </span>
                   </button>
