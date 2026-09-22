@@ -7,10 +7,10 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    allowedHosts: ["admin.falcon3.ru"],
+    allowedHosts: ["admin.falcon3sales.com"],
   },
 
   preview: {
-    allowedHosts: ["admin.falcon3.ru"],
+    allowedHosts: ["admin.falcon3sales.com"],
   },
 });
